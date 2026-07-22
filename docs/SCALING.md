@@ -18,29 +18,33 @@ Any of these work; all give you backups, encryption at rest, and a connection po
 
 Local Postgres for testing is in `docker-compose.yml` (`docker compose up -d`).
 
-## 2. Switch the provider
+## 2. Point at your Postgres
 
-In `prisma/schema.prisma`, change the datasource and add a direct URL for migrations
-(poolers can't run DDL):
+The schema is already `provider = "postgresql"` using a single `DATABASE_URL` — set that to
+your managed instance and you're done. A **direct** connection is only needed when
+`DATABASE_URL` is a *pooled* URL (a pooler can't run DDL); in that case add a direct URL for
+migrations **and** uncomment the `directUrl` line in `prisma/schema.prisma`:
 
 ```prisma
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")   // pooled connection (app runtime)
-  directUrl = env("DIRECT_URL")     // direct connection (migrations)
+  directUrl = env("DIRECT_URL")     // direct connection (migrations) — pooled setups only
 }
 ```
 
 ```bash
-# .env (production)
+# .env — ONLY when DATABASE_URL is a pooled URL
 DATABASE_URL="postgresql://user:pass@HOST:6543/finbud?pgbouncer=true&sslmode=require"  # pooled
 DIRECT_URL="postgresql://user:pass@HOST:5432/finbud?sslmode=require"                    # direct
 ```
 
-## 3. Use migrations, not `db push`
+Railway's default Postgres is a direct connection, so leave `directUrl` out there.
 
-Dev used `prisma db push` for speed. Production should use **versioned migrations** so
-schema changes are reviewable and repeatable:
+## 3. Migrations are versioned
+
+Schema changes ship as versioned migrations (committed under `prisma/migrations/`), applied
+on deploy:
 
 ```bash
 npm run migrate:dev      # create a migration from schema changes (dev)

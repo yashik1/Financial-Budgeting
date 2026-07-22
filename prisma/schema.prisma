@@ -10,9 +10,11 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL") // pooled connection (app runtime)
-  directUrl = env("DIRECT_URL") // direct connection (migrations); falls back to DATABASE_URL if unset
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // If you put a *pooled* URL in DATABASE_URL (e.g. PgBouncer/Neon pooler), add a
+  // direct connection for migrations:  directUrl = env("DIRECT_URL")
+  // Railway's default Postgres is a direct connection, so this isn't needed there.
 }
 
 model User {

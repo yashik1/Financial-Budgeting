@@ -17,7 +17,6 @@ On the **web service → Variables**, add:
 | Variable | Value |
 |---|---|
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (references the Postgres plugin) |
-| `DIRECT_URL` | `${{Postgres.DATABASE_URL}}` |
 | `AUTH_SECRET` | a 32-byte hex string (below) |
 | `ENCRYPTION_KEY` | a 32-byte hex string (below) |
 | `AGGREGATION_PROVIDER` | `demo` (or `plaid` once keys are set) |
