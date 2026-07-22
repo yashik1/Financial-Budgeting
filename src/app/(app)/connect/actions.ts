@@ -16,6 +16,7 @@ import {
   fetchSnapTradeData,
 } from "@/lib/aggregation/snaptrade";
 import { upsertAccounts, upsertTransactions, removeTransactions } from "@/lib/aggregation/sync";
+import { encryptSecret, decryptSecret } from "@/lib/crypto";
 
 type Result = { ok: boolean; message: string; imported?: number };
 
@@ -38,10 +39,11 @@ export async function finishPlaidLink(publicToken: string): Promise<Result> {
   if (!isPlaidEnabled()) return { ok: false, message: "Plaid keys are not configured." };
   try {
     const { accessToken, itemId } = await exchangePlaidPublicToken(publicToken);
+    const encrypted = encryptSecret(accessToken);
     await prisma.plaidItem.upsert({
       where: { itemId },
-      update: { accessToken },
-      create: { userId: user.id, itemId, accessToken },
+      update: { accessToken: encrypted },
+      create: { userId: user.id, itemId, accessToken: encrypted },
     });
     const imported = await syncOnePlaidItem(user.id, itemId, accessToken, null);
     revalidatePath("/accounts");
@@ -69,7 +71,7 @@ export async function syncPlaid(): Promise<Result> {
   try {
     let imported = 0;
     for (const item of items) {
-      imported += await syncOnePlaidItem(user.id, item.itemId, item.accessToken, item.cursor);
+      imported += await syncOnePlaidItem(user.id, item.itemId, decryptSecret(item.accessToken), item.cursor);
     }
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
@@ -86,13 +88,17 @@ export async function connectSnapTrade(): Promise<{ url?: string; error?: string
   if (!isSnapTradeEnabled()) return { error: "SnapTrade keys are not configured." };
   try {
     let conn = await prisma.snapTradeConnection.findUnique({ where: { userId: user.id } });
+    let userSecret: string;
     if (!conn) {
-      const { snapUserId, userSecret } = await registerSnapTradeUser(user.id);
+      const registered = await registerSnapTradeUser(user.id);
+      userSecret = registered.userSecret;
       conn = await prisma.snapTradeConnection.create({
-        data: { userId: user.id, snapUserId, userSecret },
+        data: { userId: user.id, snapUserId: registered.snapUserId, userSecret: encryptSecret(userSecret) },
       });
+    } else {
+      userSecret = decryptSecret(conn.userSecret);
     }
-    const url = await getSnapTradePortalUrl(conn.snapUserId, conn.userSecret);
+    const url = await getSnapTradePortalUrl(conn.snapUserId, userSecret);
     return { url };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not start SnapTrade." };
@@ -105,7 +111,7 @@ export async function syncSnapTrade(): Promise<Result> {
   const conn = await prisma.snapTradeConnection.findUnique({ where: { userId: user.id } });
   if (!conn) return { ok: false, message: "No brokerage connected yet." };
   try {
-    const { accounts, transactions } = await fetchSnapTradeData(conn.snapUserId, conn.userSecret);
+    const { accounts, transactions } = await fetchSnapTradeData(conn.snapUserId, decryptSecret(conn.userSecret));
     const accountMap = await upsertAccounts(user.id, "snaptrade", accounts);
     const imported = await upsertTransactions(user.id, accountMap, transactions);
     revalidatePath("/accounts");

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Receipt, Wallet, Target, Landmark } from "lucide-react";
+import { LayoutDashboard, Receipt, Wallet, Target, Landmark, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const LINKS = [
@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/budgets", label: "Budgets", icon: Wallet },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/accounts", label: "Accounts", icon: Landmark },
+  { href: "/insights", label: "AI Coach", icon: Sparkles },
 ];
 
 export function Nav({ orientation = "vertical" }: { orientation?: "vertical" | "horizontal" }) {

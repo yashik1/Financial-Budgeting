@@ -40,7 +40,23 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
 - **CSV import** — upload a bank/brokerage export, map columns (single-amount or debit/credit),
   preview, and import with automatic categorization.
 - **Gamification** — levels & points, on-budget streaks, monthly challenges, unlockable achievements.
+- **AI Coach** *(optional)* — "ask your money anything" chat + auto-generated insights, powered by
+  the Claude API (`claude-opus-4-8`). Off until you add `ANTHROPIC_API_KEY`.
 - **Polish** — light/dark themes, responsive layout, PWA-installable, animated charts.
+
+### Security & data protection
+
+Provider access tokens/secrets are **encrypted at rest** (AES-256-GCM, `src/lib/crypto.ts`),
+passwords are scrypt-hashed, sessions are httpOnly/Secure/SameSite cookies, and every response
+carries security headers. Full posture + production checklist + compliance notes in
+[`SECURITY.md`](./SECURITY.md).
+
+### Scaling & going mobile
+
+- **Database at scale:** SQLite dev → managed **Postgres** prod with pooling and versioned
+  migrations — see [`docs/SCALING.md`](./docs/SCALING.md).
+- **Make it an app:** it's an installable PWA today; App Store/Play Store via a Capacitor
+  wrapper that reuses this whole app — see [`docs/MOBILE.md`](./docs/MOBILE.md).
 
 ---
 
@@ -170,9 +186,10 @@ npm run setup
 
 - **P2** — Plaid + SnapTrade **sandbox is done**; next: production access, a scheduled
   background sync, webhook-driven updates, and reconnection handling
-- **P3** — AI insights & chat ("ask your money anything"), smarter categorization, forecasts
-- **P4** — couples / shared households with per-person views & privacy controls
-- **P5** — native mobile client reusing the backend & domain logic
+- **P3** — AI insights & chat: **done** (`ANTHROPIC_API_KEY` → live Coach); next: AI-assisted
+  categorization and spending forecasts
+- **P4** — couples / shared households with per-person views & privacy controls (schema stubbed)
+- **P5** — native mobile: PWA today; Capacitor wrapper next (see `docs/MOBILE.md`)
 
 ---
 

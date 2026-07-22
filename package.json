@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:reset": "prisma db push --force-reset",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "test": "vitest run",
@@ -20,6 +22,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.5",
     "@prisma/client": "^5.22.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
