@@ -1,0 +1,176 @@
+// FinBud data model.
+//
+// Portability note: dev uses SQLite for zero-setup. To move to Postgres,
+// change `provider` below to "postgresql" and point DATABASE_URL at your DB
+// (docker-compose.yml provides one). The schema avoids Prisma enums and Json
+// and stores all money as integer minor units (cents) so it ports cleanly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String? // null for the seeded demo user (magic "Try the demo" login)
+  isDemo       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id])
+
+  accounts     Account[]
+  transactions Transaction[]
+  categories   Category[]
+  budgetLines  BudgetLine[]
+  goals        Goal[]
+  rules        Rule[]
+  achievements Achievement[]
+  stats        UserStats?
+}
+
+// Stubbed for the future "couples / shared" phase — unused in v1.
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  members   User[]
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name     String
+  group    String // "Income" | "Essentials" | "Lifestyle" | "Financial" | "Other"
+  icon     String  @default("💸") // emoji
+  color    String  @default("#635BFF")
+  isIncome Boolean @default(false)
+  sort     Int     @default(0)
+
+  transactions Transaction[]
+  budgetLines  BudgetLine[]
+  rules        Rule[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Account {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  type          String // "checking" | "savings" | "credit" | "investment" | "cash" | "loan"
+  institution   String
+  mask          String   @default("0000") // last 4
+  balanceCents  Int      @default(0)
+  currency      String   @default("USD")
+  isAsset       Boolean  @default(true) // false for credit/loan (liabilities)
+  color         String   @default("#635BFF")
+  providerId    String   @default("demo") // demo | plaid | snaptrade | manual | csv
+  externalId    String? // provider's account id (for real aggregation later)
+  createdAt     DateTime @default(now())
+
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  date           DateTime
+  // Signed cents: negative = outflow (spending), positive = inflow (income).
+  amountCents    Int
+  merchant       String
+  rawDescription String   @default("")
+  categoryId     String?
+  category       Category? @relation(fields: [categoryId], references: [id])
+  pending        Boolean  @default(false)
+  isTransfer     Boolean  @default(false)
+  notes          String?
+  // Splits: a child references its parent; parent keeps the original amount.
+  splitParentId  String?
+  splitParent    Transaction?  @relation("Splits", fields: [splitParentId], references: [id])
+  splits         Transaction[] @relation("Splits")
+  createdAt      DateTime @default(now())
+
+  @@index([userId, date])
+  @@index([accountId])
+  @@index([categoryId])
+}
+
+// Envelope / zero-based budgeting: one limit per category per month.
+model BudgetLine {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  month      String // "YYYY-MM"
+  limitCents Int
+
+  @@unique([userId, categoryId, month])
+  @@index([userId, month])
+}
+
+model Goal {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  emoji      String    @default("🎯")
+  targetCents Int
+  savedCents  Int      @default(0)
+  color      String    @default("#16A374")
+  deadline   DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Auto-categorization rule: if `matcher` appears in the description, apply category.
+model Rule {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matcher    String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  priority   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Persisted gamification unlocks. Definitions live in code (lib/gamification).
+model Achievement {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key        String
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model UserStats {
+  id             String @id @default(cuid())
+  userId         String @unique
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points         Int    @default(0)
+  level          Int    @default(1)
+  savingsStreak  Int    @default(0) // consecutive on-budget months
+  longestStreak  Int    @default(0)
+}

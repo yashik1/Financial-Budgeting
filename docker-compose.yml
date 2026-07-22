@@ -1,0 +1,27 @@
+# Optional Postgres for production-like runs.
+# Dev defaults to SQLite (zero setup). To use Postgres:
+#   1) docker compose up -d
+#   2) in prisma/schema.prisma set datasource `provider = "postgresql"`
+#   3) set DATABASE_URL=postgresql://finbud:finbud@localhost:5432/finbud?schema=public
+#   4) npm run setup
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: finbud-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finbud
+      POSTGRES_PASSWORD: finbud
+      POSTGRES_DB: finbud
+    ports:
+      - "5432:5432"
+    volumes:
+      - finbud-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finbud"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  finbud-db-data:

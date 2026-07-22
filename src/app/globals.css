@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------ */
+/* Design tokens. Values are `R G B` triplets so Tailwind's            */
+/* `rgb(var(--token) / <alpha-value>)` opacity syntax works.           */
+/* ------------------------------------------------------------------ */
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --bg: 247 247 251;
+  --surface: 255 255 255;
+  --surface-2: 244 244 249;
+  --border: 228 228 238;
+  --muted: 110 112 130;
+  --fg: 22 23 38;
+
+  --brand: 99 91 255; /* indigo-violet */
+  --brand-soft: 232 231 255;
+  --positive: 22 163 116; /* emerald */
+  --negative: 225 76 96; /* rose */
+  --warning: 217 148 40; /* amber */
+}
+
+.dark {
+  --bg: 13 14 22;
+  --surface: 22 24 35;
+  --surface-2: 30 32 46;
+  --border: 42 45 63;
+  --muted: 148 151 173;
+  --fg: 236 237 247;
+
+  --brand: 138 132 255;
+  --brand-soft: 39 38 66;
+  --positive: 52 199 149;
+  --negative: 247 111 130;
+  --warning: 240 180 78;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numbers align nicely in tables/amounts */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Thin, unobtrusive scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted) / 0.5);
+  background-clip: content-box;
+}
+
+/* Reusable component classes */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-border bg-surface shadow-card;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white hover:brightness-110 active:brightness-95;
+  }
+  .btn-ghost {
+    @apply btn border border-border bg-surface text-fg hover:bg-surface-2;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .input {
+    @apply w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-fg
+           placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
+  }
+}

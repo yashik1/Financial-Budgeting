@@ -1,0 +1,12 @@
+{
+  "name": "FinBud",
+  "short_name": "FinBud",
+  "description": "Budgeting that's actually fun.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0d0e16",
+  "theme_color": "#635BFF",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
