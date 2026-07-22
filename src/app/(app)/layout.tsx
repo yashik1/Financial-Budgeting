@@ -12,6 +12,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
+      <a href="#main" className="skip-link btn-primary">
+        Skip to content
+      </a>
+
       {/* Sidebar (desktop) */}
       <aside className="sticky top-0 hidden h-screen flex-col border-r border-border bg-surface p-4 lg:flex">
         <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-2 text-lg font-extrabold tracking-tight">
@@ -73,7 +77,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
 
       {/* Main */}
-      <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 lg:px-8 lg:pb-10">{children}</main>
+      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 outline-none lg:px-8 lg:pb-10">
+        {children}
+      </main>
 
       {/* Bottom nav (mobile) */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/90 p-2 backdrop-blur lg:hidden">

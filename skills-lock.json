@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "ck:ui-ux-pro-max": {
+      "source": "binjuhor/shadcn-lar",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "938426e2cf2d811b2ef1b4e201a3a91e450ff9f7e2d8971f1fd8b51fd921421c"
+    },
+    "frontend-design": {
+      "source": "anthropics/claude-code",
+      "sourceType": "github",
+      "skillPath": "plugins/frontend-design/skills/frontend-design/SKILL.md",
+      "computedHash": "3e0be122a3db8206b6d0d6b07cca898b5c75fb9b7b2101abe143fb2851734d2e"
+    }
+  }
+}

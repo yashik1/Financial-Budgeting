@@ -25,8 +25,14 @@ function ChartTooltip({ active, payload }: any) {
 }
 
 export function NetWorthChart({ data }: { data: Point[] }) {
+  const first = data[0];
+  const last = data[data.length - 1];
+  const summary =
+    first && last
+      ? `Net worth over ${data.length} months: ${formatCents(first.cents)} in ${shortMonthLabel(first.month)}, ${formatCents(last.cents)} in ${shortMonthLabel(last.month)}.`
+      : "Net worth trend chart.";
   return (
-    <div className="h-56 w-full">
+    <div className="h-56 w-full" role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
           <defs>

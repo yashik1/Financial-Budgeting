@@ -31,9 +31,13 @@ export function foldSlices(slices: Slice[], max = 6): Slice[] {
 export function CategoryDonut({ data }: { data: Slice[] }) {
   const slices = foldSlices(data);
   const total = slices.reduce((s, x) => s + x.cents, 0);
+  const top = slices[0];
+  const summary = top
+    ? `Spending by category, ${formatCents(total)} total. Largest: ${top.name} at ${formatCents(top.cents)}.`
+    : "No spending recorded for this month.";
 
   return (
-    <div className="relative h-48 w-full">
+    <div className="relative h-48 w-full" role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie

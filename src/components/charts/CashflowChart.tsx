@@ -27,9 +27,13 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export function CashflowChart({ data }: { data: Row[] }) {
+  const last = data[data.length - 1];
+  const summary = last
+    ? `Monthly income versus spending, ${data.length} months. Latest (${shortMonthLabel(last.month)}): income ${formatCents(last.incomeCents)}, spending ${formatCents(last.spendingCents)}.`
+    : "Monthly income versus spending chart.";
   return (
-    <div>
-      <div className="mb-2 flex items-center gap-4 text-xs text-muted">
+    <div role="img" aria-label={summary}>
+      <div className="mb-2 flex items-center gap-4 text-xs text-muted" aria-hidden>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: INCOME }} /> Income
         </span>

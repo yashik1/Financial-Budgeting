@@ -8,31 +8,33 @@
 /* Direction: neutral foundation, one precise accent, high-contrast    */
 /* numbers, soft depth, minimal borders (2026 fintech).                */
 /* ------------------------------------------------------------------ */
+/* Warm porcelain neutrals (a nod to Fitch the fox) + refined indigo accent.
+   Muted text is contrast-checked: ≥4.5:1 on surface and surface-2 (WCAG AA). */
 :root {
-  --bg: 247 248 250;
+  --bg: 248 247 245;
   --surface: 255 255 255;
-  --surface-2: 241 243 246;
-  --border: 228 231 237;
-  --muted: 108 116 131;
-  --fg: 18 21 28;
+  --surface-2: 243 242 239;
+  --border: 229 227 222;
+  --muted: 92 101 117;
+  --fg: 24 22 18;
 
   --brand: 88 80 236; /* refined indigo */
   --brand-soft: 235 234 253;
-  --positive: 22 163 116;
-  --negative: 222 68 90;
-  --warning: 200 132 22;
+  --positive: 15 138 98;
+  --negative: 210 56 79;
+  --warning: 176 116 18;
 
-  --shadow-card: 0 1px 2px rgb(16 20 30 / 0.05), 0 6px 20px -10px rgb(16 20 30 / 0.12);
-  --shadow-pop: 0 12px 40px -12px rgb(16 20 30 / 0.28);
+  --shadow-card: 0 1px 2px rgb(30 25 15 / 0.04), 0 8px 24px -12px rgb(30 25 15 / 0.1);
+  --shadow-pop: 0 12px 40px -12px rgb(30 25 15 / 0.25);
 }
 
 .dark {
-  --bg: 11 12 16;
-  --surface: 20 22 29;
-  --surface-2: 28 31 40;
-  --border: 39 43 54;
-  --muted: 152 158 173;
-  --fg: 232 234 242;
+  --bg: 13 13 15;
+  --surface: 21 22 26;
+  --surface-2: 29 30 36;
+  --border: 41 42 50;
+  --muted: 158 162 175;
+  --fg: 234 234 240;
 
   --brand: 139 132 255;
   --brand-soft: 40 39 66;
@@ -63,6 +65,44 @@ body {
 /* Headings: tighter tracking for a refined, modern-classic feel. */
 h1, h2, h3 {
   letter-spacing: -0.02em;
+}
+
+/* ---------------------------------------------------------------- */
+/* Accessibility floor: visible focus, honest cursors, calm motion. */
+/* ---------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid rgb(var(--brand));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/* Skip link: hidden until keyboard-focused, then front and center. */
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 100;
+  transform: translate(-50%, -300%);
+  transition: transform 150ms ease-out;
+}
+.skip-link:focus-visible {
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Tabular, aligned figures — numbers are the hero in finance UIs. */

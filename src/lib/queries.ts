@@ -213,9 +213,13 @@ function buildComparison(
   };
 }
 
-/** Everything the dashboard needs, composed. Defaults to the current month. */
-export async function getDashboard(userId: string, month: string = currentMonthKey()) {
-  const prevMonth = addMonthsToKey(month, -1);
+/**
+ * Everything the dashboard needs, composed. Defaults to the current month,
+ * compared against the month before it; `compareWith` swaps the baseline
+ * (e.g. same month last year).
+ */
+export async function getDashboard(userId: string, month: string = currentMonthKey(), compareWith?: string) {
+  const prevMonth = compareWith && compareWith !== month ? compareWith : addMonthsToKey(month, -1);
   const [accounts, overview, prevOverview, trend, cashflow, game] = await Promise.all([
     getAccountsOverview(userId),
     getMonthOverview(userId, month),

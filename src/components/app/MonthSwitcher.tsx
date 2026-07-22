@@ -25,19 +25,21 @@ export function MonthSwitcher({ month, basePath }: { month: string; basePath?: s
     <div className="inline-flex items-center gap-0.5 rounded-xl border border-border bg-surface p-1">
       <button
         onClick={() => go(-1)}
-        className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-fg"
+        className="grid h-10 w-10 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-fg"
         aria-label="Previous month"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4" aria-hidden />
       </button>
-      <span className="min-w-[8.5rem] px-1 text-center text-sm font-semibold">{monthLabel(month)}</span>
+      <span className="min-w-[8.5rem] px-1 text-center text-sm font-semibold" aria-live="polite">
+        {monthLabel(month)}
+      </span>
       <button
         onClick={() => go(1)}
         disabled={atCurrent}
-        className="grid h-8 w-8 place-items-center rounded-lg text-muted transition enabled:hover:bg-surface-2 enabled:hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
+        className="grid h-10 w-10 place-items-center rounded-lg text-muted transition enabled:hover:bg-surface-2 enabled:hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Next month"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4" aria-hidden />
       </button>
     </div>
   );
