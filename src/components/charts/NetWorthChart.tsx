@@ -13,23 +13,23 @@ import { shortMonthLabel } from "@/lib/dates";
 
 type Point = { month: string; cents: number };
 
-function ChartTooltip({ active, payload }: any) {
+function ChartTooltip({ active, payload, currency }: any) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload as Point;
   return (
     <div className="rounded-xl border border-border bg-surface px-3 py-2 shadow-card">
       <div className="text-xs text-muted">{shortMonthLabel(p.month)}</div>
-      <div className="font-bold tabular">{formatCents(p.cents)}</div>
+      <div className="font-bold tabular">{formatCents(p.cents, { currency })}</div>
     </div>
   );
 }
 
-export function NetWorthChart({ data }: { data: Point[] }) {
+export function NetWorthChart({ data, currency }: { data: Point[]; currency?: string }) {
   const first = data[0];
   const last = data[data.length - 1];
   const summary =
     first && last
-      ? `Net worth over ${data.length} months: ${formatCents(first.cents)} in ${shortMonthLabel(first.month)}, ${formatCents(last.cents)} in ${shortMonthLabel(last.month)}.`
+      ? `Net worth over ${data.length} months: ${formatCents(first.cents, { currency })} in ${shortMonthLabel(first.month)}, ${formatCents(last.cents, { currency })} in ${shortMonthLabel(last.month)}.`
       : "Net worth trend chart.";
   return (
     <div className="h-56 w-full" role="img" aria-label={summary}>
@@ -50,7 +50,7 @@ export function NetWorthChart({ data }: { data: Point[] }) {
             dy={6}
           />
           <YAxis hide domain={["dataMin - 100000", "dataMax + 100000"]} />
-          <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#7B74FF", strokeDasharray: 4 }} />
+          <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ stroke: "#7B74FF", strokeDasharray: 4 }} />
           <Area
             type="monotone"
             dataKey="cents"

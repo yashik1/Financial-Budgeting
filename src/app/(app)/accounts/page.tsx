@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getAccountsOverview } from "@/lib/queries";
-import { formatCents } from "@/lib/money";
+import { formatCents, safeCurrency, currencySymbol } from "@/lib/money";
 import { addManualAccount, addDemoAccounts } from "@/app/(app)/actions";
 import { isPlaidEnabled } from "@/lib/aggregation/plaid";
 import { isSnapTradeEnabled } from "@/lib/aggregation/snaptrade";
@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default async function AccountsPage() {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const { accounts, assetsCents, liabilitiesCents, netWorthCents } = await getAccountsOverview(user.id);
   const [plaidCount, snapConn] = await Promise.all([
     prisma.plaidItem.count({ where: { userId: user.id } }),
@@ -48,15 +49,15 @@ export default async function AccountsPage() {
       <div className="card grid grid-cols-3 gap-4 p-5">
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Assets</div>
-          <div className="text-xl font-extrabold tabular text-positive">{formatCents(assetsCents)}</div>
+          <div className="text-xl font-extrabold tabular text-positive">{formatCents(assetsCents, { currency })}</div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Liabilities</div>
-          <div className="text-xl font-extrabold tabular text-negative">{formatCents(liabilitiesCents)}</div>
+          <div className="text-xl font-extrabold tabular text-negative">{formatCents(liabilitiesCents, { currency })}</div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Net worth</div>
-          <div className="text-xl font-extrabold tabular">{formatCents(netWorthCents)}</div>
+          <div className="text-xl font-extrabold tabular">{formatCents(netWorthCents, { currency })}</div>
         </div>
       </div>
 
@@ -79,7 +80,7 @@ export default async function AccountsPage() {
                     <div className="text-xs text-muted">{TYPE_LABEL[a.type] ?? a.type} ···· {a.mask}</div>
                   </div>
                   <div className={cn("ml-auto text-right font-semibold tabular", a.balanceCents < 0 ? "text-negative" : "text-fg")}>
-                    {formatCents(a.balanceCents)}
+                    {formatCents(a.balanceCents, { currency })}
                   </div>
                 </div>
               ))}
@@ -136,7 +137,7 @@ export default async function AccountsPage() {
               </select>
             </div>
             <div className="col-span-2">
-              <label className="label" htmlFor="balance">Current balance ($)</label>
+              <label className="label" htmlFor="balance">Current balance ({currencySymbol(currency)})</label>
               <input id="balance" name="balance" inputMode="decimal" className="input" placeholder="1000" />
             </div>
           </div>

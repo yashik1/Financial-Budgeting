@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/session";
 import { getHouseholdData } from "@/lib/queries";
-import { formatCents } from "@/lib/money";
+import { formatCents, safeCurrency } from "@/lib/money";
 import { monthLabel, currentMonthKey } from "@/lib/dates";
 import { StatTile, SectionHeader } from "@/components/ui/StatTile";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
@@ -17,6 +17,7 @@ import { Users, UserPlus, LogOut, Wallet, TrendingUp, TrendingDown, PiggyBank, X
 
 export default async function HouseholdPage() {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const data = await getHouseholdData(user.id);
   if (!data) return null;
 
@@ -107,10 +108,10 @@ export default async function HouseholdPage() {
 
       {/* Combined stat tiles */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Household net worth" value={formatCents(data.netWorthCents)} accent="brand" icon={<Wallet className="h-4 w-4" />} sub={`${data.accounts.length} shared accounts`} />
-        <StatTile label="Income" value={formatCents(data.incomeCents)} accent="positive" icon={<TrendingUp className="h-4 w-4" />} sub="this month" />
-        <StatTile label="Spending" value={formatCents(data.spendingCents)} accent="negative" icon={<TrendingDown className="h-4 w-4" />} sub="this month" />
-        <StatTile label="Saved" value={formatCents(data.netCents, { signed: true })} accent={data.netCents >= 0 ? "positive" : "negative"} icon={<PiggyBank className="h-4 w-4" />} sub="together" />
+        <StatTile label="Household net worth" value={formatCents(data.netWorthCents, { currency })} accent="brand" icon={<Wallet className="h-4 w-4" />} sub={`${data.accounts.length} shared accounts`} />
+        <StatTile label="Income" value={formatCents(data.incomeCents, { currency })} accent="positive" icon={<TrendingUp className="h-4 w-4" />} sub="this month" />
+        <StatTile label="Spending" value={formatCents(data.spendingCents, { currency })} accent="negative" icon={<TrendingDown className="h-4 w-4" />} sub="this month" />
+        <StatTile label="Saved" value={formatCents(data.netCents, { currency, signed: true })} accent={data.netCents >= 0 ? "positive" : "negative"} icon={<PiggyBank className="h-4 w-4" />} sub="together" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -119,13 +120,13 @@ export default async function HouseholdPage() {
             <SectionHeader title="Combined spending" hint={month} />
             {data.categorySpend.length ? (
               <>
-                <CategoryDonut data={data.categorySpend} />
+                <CategoryDonut data={data.categorySpend} currency={currency} />
                 <ul className="mt-3 space-y-1.5">
                   {data.categorySpend.slice(0, 6).map((c) => (
                     <li key={c.id} className="flex items-center gap-2 text-sm">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
                       <span>{c.icon} {c.name}</span>
-                      <span className="ml-auto tabular font-medium">{formatCents(c.cents, { compact: true })}</span>
+                      <span className="ml-auto tabular font-medium">{formatCents(c.cents, { currency, compact: true })}</span>
                     </li>
                   ))}
                 </ul>
@@ -144,7 +145,7 @@ export default async function HouseholdPage() {
                   <span className="h-6 w-1.5 rounded-full" style={{ background: a.color }} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{a.name}</div>
-                    <div className="text-xs text-muted">{a.institution} · {formatCents(a.balanceCents)}</div>
+                    <div className="text-xs text-muted">{a.institution} · {formatCents(a.balanceCents, { currency })}</div>
                   </div>
                   <PrivacyToggle id={a.id} shared={a.shared} kind="account" />
                 </div>
@@ -154,7 +155,7 @@ export default async function HouseholdPage() {
                   <span className="grid h-7 w-7 place-items-center rounded-lg" style={{ background: `${g.color}22` }}>{g.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{g.name}</div>
-                    <div className="text-xs text-muted">Goal · {formatCents(g.savedCents, { compact: true })} saved</div>
+                    <div className="text-xs text-muted">Goal · {formatCents(g.savedCents, { currency, compact: true })} saved</div>
                   </div>
                   <PrivacyToggle id={g.id} shared={g.shared} kind="goal" />
                 </div>
@@ -177,11 +178,11 @@ export default async function HouseholdPage() {
                   <li key={p.id} className="rounded-xl bg-surface-2 p-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-semibold">{p.name}{p.isYou && <span className="ml-1 text-xs text-muted">(you)</span>}</span>
-                      <span className={`tabular ${net >= 0 ? "text-positive" : "text-negative"}`}>{formatCents(net, { signed: true })}</span>
+                      <span className={`tabular ${net >= 0 ? "text-positive" : "text-negative"}`}>{formatCents(net, { currency, signed: true })}</span>
                     </div>
                     <div className="mt-1 flex justify-between text-xs text-muted">
-                      <span>In {formatCents(p.incomeCents, { compact: true })}</span>
-                      <span>Out {formatCents(p.spentCents, { compact: true })}</span>
+                      <span>In {formatCents(p.incomeCents, { currency, compact: true })}</span>
+                      <span>Out {formatCents(p.spentCents, { currency, compact: true })}</span>
                     </div>
                   </li>
                 );

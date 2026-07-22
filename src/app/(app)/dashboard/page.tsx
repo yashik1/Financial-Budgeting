@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { getDashboard, getGoals, type MoneyDelta } from "@/lib/queries";
-import { formatCents } from "@/lib/money";
+import { formatCents, safeCurrency } from "@/lib/money";
 import { addMonthsToKey, monthLabel, safeMonthKey } from "@/lib/dates";
 import { StatTile, SectionHeader } from "@/components/ui/StatTile";
 import { MascotCard } from "@/components/app/MascotCard";
@@ -34,11 +34,12 @@ export default async function DashboardPage({
   searchParams: Promise<{ month?: string; compare?: string }>;
 }) {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const sp = await searchParams;
   const month = safeMonthKey(sp.month);
   // Baseline for the comparison; anything invalid falls back to the previous month.
   const compare = safeMonthKey(sp.compare, addMonthsToKey(month, -1));
-  const [dash, goals] = await Promise.all([getDashboard(user.id, month, compare), getGoals(user.id)]);
+  const [dash, goals] = await Promise.all([getDashboard(user.id, month, compare, currency), getGoals(user.id)]);
   const { accounts, overview, trend, cashflow, game, mascot, challenge, comparison } = dash;
   const baselineLabel = comparison.prevMonth === addMonthsToKey(month, -1) ? "last month" : monthLabel(comparison.prevMonth);
 
@@ -78,12 +79,12 @@ export default async function DashboardPage({
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Net worth" value={formatCents(accounts.netWorthCents)} accent="brand" icon={<Wallet className="h-4 w-4" />} sub={`${accounts.accounts.length} accounts`} />
-        <StatTile label="Income" value={formatCents(overview.incomeCents)} accent="positive" icon={<TrendingUp className="h-4 w-4" />} sub={deltaSub(comparison.income, baselineLabel)} />
-        <StatTile label="Spending" value={formatCents(overview.spendingCents)} accent="negative" icon={<TrendingDown className="h-4 w-4" />} sub={deltaSub(comparison.spending, baselineLabel)} />
+        <StatTile label="Net worth" value={formatCents(accounts.netWorthCents, { currency })} accent="brand" icon={<Wallet className="h-4 w-4" />} sub={`${accounts.accounts.length} accounts`} />
+        <StatTile label="Income" value={formatCents(overview.incomeCents, { currency })} accent="positive" icon={<TrendingUp className="h-4 w-4" />} sub={deltaSub(comparison.income, baselineLabel)} />
+        <StatTile label="Spending" value={formatCents(overview.spendingCents, { currency })} accent="negative" icon={<TrendingDown className="h-4 w-4" />} sub={deltaSub(comparison.spending, baselineLabel)} />
         <StatTile
           label="Saved"
-          value={formatCents(overview.netCents, { signed: true })}
+          value={formatCents(overview.netCents, { currency, signed: true })}
           accent={overview.netCents >= 0 ? "positive" : "negative"}
           icon={<PiggyBank className="h-4 w-4" />}
           sub={overview.incomeCents > 0 ? `${Math.round((overview.netCents / overview.incomeCents) * 100)}% of income` : "—"}
@@ -95,12 +96,12 @@ export default async function DashboardPage({
         <div className="space-y-6 lg:col-span-2">
           <section className="card p-5" aria-label="Net worth trend">
             <SectionHeader title="Net worth" hint="Last 6 months" />
-            <NetWorthChart data={trend} />
+            <NetWorthChart data={trend} currency={currency} />
           </section>
 
           <section className="card p-5" aria-label="Cash flow">
             <SectionHeader title="Cash flow" hint="Income vs spending" />
-            <CashflowChart data={cashflow} />
+            <CashflowChart data={cashflow} currency={currency} />
           </section>
 
           <div className="grid gap-6 xl:grid-cols-2">
@@ -115,7 +116,7 @@ export default async function DashboardPage({
               />
               <div className="divide-y divide-border">
                 {budgetRows.length ? (
-                  budgetRows.map((r) => <BudgetRow key={r.categoryId} row={r} />)
+                  budgetRows.map((r) => <BudgetRow key={r.categoryId} row={r} currency={currency} />)
                 ) : (
                   <p className="py-6 text-center text-sm text-muted">No budgets yet.</p>
                 )}
@@ -124,13 +125,13 @@ export default async function DashboardPage({
 
             <section className="card p-5" aria-label="Spending by category">
               <SectionHeader title="Where it went" hint={monthLabel(overview.month)} />
-              <CategoryDonut data={overview.categorySpend} />
+              <CategoryDonut data={overview.categorySpend} currency={currency} />
               <ul className="mt-3 space-y-1.5">
                 {overview.categorySpend.slice(0, 5).map((c) => (
                   <li key={c.id} className="flex items-center gap-2 text-sm">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} aria-hidden />
                     <span>{c.icon} {c.name}</span>
-                    <span className="ml-auto tabular font-medium">{formatCents(c.cents, { compact: true })}</span>
+                    <span className="ml-auto tabular font-medium">{formatCents(c.cents, { currency, compact: true })}</span>
                   </li>
                 ))}
               </ul>
@@ -140,11 +141,11 @@ export default async function DashboardPage({
 
         {/* Right column: coach, insights, motivation */}
         <div className="space-y-6">
-          <MascotCard mascot={mascot} streak={game.stats.savingsStreak} challenge={challenge} />
+          <MascotCard mascot={mascot} streak={game.stats.savingsStreak} challenge={challenge} currency={currency} />
 
           <section className="card p-5" aria-label="Monthly insights">
             <SectionHeader title="Monthly insights" hint={monthLabel(overview.month)} />
-            <MonthComparison data={comparison} />
+            <MonthComparison data={comparison} currency={currency} />
           </section>
 
           <section className="card p-5" aria-label="Goals">

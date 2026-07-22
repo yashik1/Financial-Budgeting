@@ -23,6 +23,7 @@ model User {
   name         String
   passwordHash String? // null for the seeded demo user (magic "Try the demo" login)
   isDemo       Boolean  @default(false)
+  currency     String   @default("USD") // ISO 4217 display currency
   createdAt    DateTime @default(now())
 
   householdId String?

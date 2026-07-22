@@ -218,7 +218,12 @@ function buildComparison(
  * compared against the month before it; `compareWith` swaps the baseline
  * (e.g. same month last year).
  */
-export async function getDashboard(userId: string, month: string = currentMonthKey(), compareWith?: string) {
+export async function getDashboard(
+  userId: string,
+  month: string = currentMonthKey(),
+  compareWith?: string,
+  currency = "USD",
+) {
   const prevMonth = compareWith && compareWith !== month ? compareWith : addMonthsToKey(month, -1);
   const [accounts, overview, prevOverview, trend, cashflow, game] = await Promise.all([
     getAccountsOverview(userId),
@@ -251,7 +256,7 @@ export async function getDashboard(userId: string, month: string = currentMonthK
     if (pct > bestPct) {
       bestPct = pct;
       const emoji = overview.catMap.get(id)?.icon ?? "🎯";
-      challenge = makeChallenge({ key: name, title: `${name} under control`, emoji, spentCents: spent, targetCents: target });
+      challenge = makeChallenge({ key: name, title: `${name} under control`, emoji, spentCents: spent, targetCents: target, currency });
     }
   }
 
@@ -305,6 +310,39 @@ export async function getTransactions(userId: string, opts: TxnFilters = {}) {
   return txns;
 }
 
+/** Distinct tags this user has applied, most-used first. */
+export async function getUsedTags(userId: string): Promise<{ tag: string; count: number }[]> {
+  const rows = await prisma.transaction.findMany({
+    where: { userId, NOT: { tags: { isEmpty: true } } },
+    select: { tags: true },
+  });
+  const counts = new Map<string, number>();
+  for (const r of rows) for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+// A transaction is "uncategorized" if it has no category, or sits in the
+// built-in catch-all category named "Uncategorized".
+const UNCATEGORIZED_WHERE = {
+  OR: [{ categoryId: null }, { category: { is: { name: "Uncategorized" } } }],
+};
+
+/** Spending transactions in a month that don't fall under any real category. */
+export async function getUncategorizedForMonth(userId: string, month: string = currentMonthKey()) {
+  const { start, end } = monthRange(month);
+  const txns = await prisma.transaction.findMany({
+    where: { userId, isTransfer: false, date: { gte: start, lte: end }, ...UNCATEGORIZED_WHERE },
+    include: { account: true },
+    orderBy: { date: "desc" },
+  });
+  const spentCents = txns
+    .filter((t) => t.amountCents < 0)
+    .reduce((s, t) => s - t.amountCents, 0);
+  return { txns, spentCents, count: txns.length };
+}
+
 export type BudgetRow = {
   categoryId: string;
   name: string;
@@ -339,7 +377,9 @@ export async function getBudgetView(userId: string, month: string = currentMonth
     };
   };
 
-  const cats = [...overview.catMap.values()].filter((c) => c.group !== "Income");
+  // The catch-all "Uncategorized" category is surfaced in its own section, not
+  // as a budget envelope.
+  const cats = [...overview.catMap.values()].filter((c) => c.group !== "Income" && c.name !== "Uncategorized");
   const childrenByParent = new Map<string, CategoryMeta[]>();
   for (const c of cats) {
     if (!c.parentId) continue;

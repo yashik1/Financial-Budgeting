@@ -1,12 +1,13 @@
 import { requireUser } from "@/lib/session";
 import { getGoals } from "@/lib/queries";
-import { formatCents } from "@/lib/money";
+import { formatCents, safeCurrency, currencySymbol } from "@/lib/money";
 import { createGoal, deleteGoal } from "@/app/(app)/actions";
 import { GoalFund } from "@/components/app/GoalFund";
 import { Trash2, Sparkles } from "lucide-react";
 
 export default async function GoalsPage() {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const goals = await getGoals(user.id);
 
   const totalTarget = goals.reduce((s, g) => s + g.targetCents, 0);
@@ -18,7 +19,7 @@ export default async function GoalsPage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Goals</h1>
           <p className="text-sm text-muted">
-            {formatCents(totalSaved, { compact: true })} saved toward {formatCents(totalTarget, { compact: true })}
+            {formatCents(totalSaved, { currency, compact: true })} saved toward {formatCents(totalTarget, { currency, compact: true })}
           </p>
         </div>
       </header>
@@ -34,7 +35,7 @@ export default async function GoalsPage() {
           <input id="name" name="name" placeholder="e.g. Emergency Fund" className="input" required />
         </div>
         <div className="w-36">
-          <label className="label" htmlFor="target">Target ($)</label>
+          <label className="label" htmlFor="target">Target ({currencySymbol(currency)})</label>
           <input id="target" name="target" inputMode="decimal" placeholder="5000" className="input" required />
         </div>
         <button className="btn-primary">
@@ -72,8 +73,8 @@ export default async function GoalsPage() {
 
               <div className="mt-4">
                 <div className="mb-1 flex items-baseline justify-between text-sm">
-                  <span className="font-semibold tabular">{formatCents(g.savedCents)}</span>
-                  <span className="text-muted tabular">of {formatCents(g.targetCents)}</span>
+                  <span className="font-semibold tabular">{formatCents(g.savedCents, { currency })}</span>
+                  <span className="text-muted tabular">of {formatCents(g.targetCents, { currency })}</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
                   <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: g.color }} />
@@ -82,7 +83,7 @@ export default async function GoalsPage() {
 
               {!done && (
                 <div className="mt-4">
-                  <GoalFund goalId={g.id} />
+                  <GoalFund goalId={g.id} currency={currency} />
                 </div>
               )}
             </div>

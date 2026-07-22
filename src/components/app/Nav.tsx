@@ -11,6 +11,7 @@ import {
   Landmark,
   Sparkles,
   Users,
+  Settings,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -23,6 +24,7 @@ const LINKS = [
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/household", label: "Household", icon: Users },
   { href: "/insights", label: "AI Coach", icon: Sparkles },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 // Bottom nav caps at 5 items (4 destinations + More) per mobile nav guidelines.

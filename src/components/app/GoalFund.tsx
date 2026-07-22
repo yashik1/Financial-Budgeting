@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { fundGoal } from "@/app/(app)/actions";
+import { currencySymbol } from "@/lib/money";
 
-export function GoalFund({ goalId }: { goalId: string }) {
+export function GoalFund({ goalId, currency = "USD" }: { goalId: string; currency?: string }) {
   const [value, setValue] = useState("");
   const [pending, start] = useTransition();
 
@@ -21,7 +22,7 @@ export function GoalFund({ goalId }: { goalId: string }) {
       className="flex items-center gap-2"
     >
       <div className="relative flex-1">
-        <span className="absolute left-2.5 top-1.5 text-sm text-muted">$</span>
+        <span className="absolute left-2.5 top-1.5 text-sm text-muted">{currencySymbol(currency)}</span>
         <input
           inputMode="decimal"
           value={value}

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { getTransactions, type TxnFilters } from "@/lib/queries";
+import { getTransactions, getUsedTags, type TxnFilters } from "@/lib/queries";
+import { safeCurrency } from "@/lib/money";
 import { TransactionItem } from "@/components/app/TransactionItem";
 import type { CatOption } from "@/components/app/CategorySelect";
-import { Upload, Search, X } from "lucide-react";
+import { Upload, Search, X, Tag } from "lucide-react";
 
 const TYPE_LABEL: Record<string, string> = {
   checking: "Checking",
@@ -26,8 +27,16 @@ type SP = {
   to?: string;
 };
 
+function qs(sp: SP, patch: Partial<SP>): string {
+  const merged: Record<string, string> = {};
+  for (const [k, v] of Object.entries({ ...sp, ...patch })) if (v) merged[k] = String(v);
+  const s = new URLSearchParams(merged).toString();
+  return s ? `/transactions?${s}` : "/transactions";
+}
+
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const sp = await searchParams;
 
   const filters: TxnFilters = {
@@ -42,10 +51,11 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     limit: 300,
   };
 
-  const [txns, categories, accounts] = await Promise.all([
+  const [txns, categories, accounts, usedTags] = await Promise.all([
     getTransactions(user.id, filters),
     prisma.category.findMany({ where: { userId: user.id }, orderBy: { sort: "asc" } }),
     prisma.account.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
+    getUsedTags(user.id),
   ]);
 
   const catOptions: CatOption[] = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, parentId: c.parentId }));
@@ -53,6 +63,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const childrenOf = new Map<string, typeof categories>();
   for (const c of categories) if (c.parentId) childrenOf.set(c.parentId, [...(childrenOf.get(c.parentId) ?? []), c]);
   const accountTypes = [...new Set(accounts.map((a) => a.type))];
+  const tagNames = usedTags.map((t) => t.tag);
   const activeFilters = Object.values(sp).filter(Boolean).length;
 
   return (
@@ -142,6 +153,29 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         </div>
       </form>
 
+      {/* Tags in use */}
+      {tagNames.length > 0 && (
+        <div className="card flex flex-wrap items-center gap-2 p-3">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+            <Tag className="h-3.5 w-3.5" /> Tags in use
+          </span>
+          {usedTags.map((t) => {
+            const active = sp.tag === t.tag;
+            return (
+              <Link
+                key={t.tag}
+                href={active ? qs(sp, { tag: "" }) : qs(sp, { tag: t.tag })}
+                className={`chip transition ${active ? "bg-brand text-white" : "bg-brand-soft text-brand hover:brightness-95"}`}
+                aria-pressed={active}
+              >
+                #{t.tag}
+                <span className={active ? "text-white/70" : "text-brand/60"}>{t.count}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       {/* List */}
       <div className="card overflow-hidden">
         <div className="divide-y divide-border">
@@ -149,6 +183,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
             <TransactionItem
               key={t.id}
               categories={catOptions}
+              currency={currency}
+              knownTags={tagNames}
               txn={{
                 id: t.id,
                 merchant: t.merchant,

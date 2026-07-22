@@ -143,10 +143,12 @@ export function makeChallenge(input: {
   spentCents: number;
   targetCents: number;
   unit?: string;
+  currency?: string;
 }): Challenge {
-  const { key, title, emoji, spentCents, targetCents } = input;
+  const { key, title, emoji, spentCents, targetCents, currency = "USD" } = input;
   const pct = targetCents > 0 ? Math.min(100, Math.round((spentCents / targetCents) * 100)) : 0;
   const remaining = Math.max(0, targetCents - spentCents);
+  const money = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency });
   return {
     key,
     title,
@@ -157,7 +159,7 @@ export function makeChallenge(input: {
     onTrack: spentCents <= targetCents,
     description:
       spentCents <= targetCents
-        ? `${(remaining / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} of headroom left`
-        : `Over by ${((spentCents - targetCents) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}`,
+        ? `${money(remaining)} of headroom left`
+        : `Over by ${money(spentCents - targetCents)}`,
   };
 }

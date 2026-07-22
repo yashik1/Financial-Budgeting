@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Pencil, Trash2, StickyNote, Check, X } from "lucide-react";
 import { CategorySelect, type CatOption } from "./CategorySelect";
 import { updateTransaction, deleteTransaction } from "@/app/(app)/actions";
-import { formatCents, centsToInput } from "@/lib/money";
+import { formatCents, centsToInput, currencySymbol } from "@/lib/money";
 
 export type TxnItem = {
   id: string;
@@ -20,11 +20,32 @@ export type TxnItem = {
   tags: string[];
 };
 
-export function TransactionItem({ txn, categories }: { txn: TxnItem; categories: CatOption[] }) {
+export function TransactionItem({
+  txn,
+  categories,
+  currency,
+  knownTags = [],
+}: {
+  txn: TxnItem;
+  categories: CatOption[];
+  currency?: string;
+  knownTags?: string[];
+}) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
+  const tagsRef = useRef<HTMLInputElement>(null);
   const dateVal = txn.dateISO.slice(0, 10);
   const income = txn.amountCents >= 0;
+
+  // Append an existing tag to the comma-separated input (no duplicates).
+  const addTag = (tag: string) => {
+    const input = tagsRef.current;
+    if (!input) return;
+    const have = input.value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (!have.includes(tag)) have.push(tag);
+    input.value = have.join(", ");
+    input.focus();
+  };
 
   return (
     <div className="px-4 py-3 hover:bg-surface-2/40">
@@ -52,7 +73,7 @@ export function TransactionItem({ txn, categories }: { txn: TxnItem; categories:
         </div>
         <CategorySelect txnId={txn.id} value={txn.categoryId} categories={categories} />
         <div className={`w-24 shrink-0 text-right font-semibold tabular ${income ? "text-positive" : "text-fg"}`}>
-          {formatCents(txn.amountCents, { signed: true })}
+          {formatCents(txn.amountCents, { currency, signed: true })}
         </div>
         <button
           onClick={() => setEditing((v) => !v)}
@@ -82,7 +103,7 @@ export function TransactionItem({ txn, categories }: { txn: TxnItem; categories:
               </select>
             </div>
             <div>
-              <label className="label">Amount ($)</label>
+              <label className="label">Amount ({currencySymbol(currency ?? "USD")})</label>
               <input name="amount" inputMode="decimal" defaultValue={centsToInput(txn.amountCents)} className="input" />
             </div>
           </div>
@@ -96,7 +117,29 @@ export function TransactionItem({ txn, categories }: { txn: TxnItem; categories:
           </div>
           <div className="sm:col-span-2">
             <label className="label">Tags <span className="normal-case text-muted">(comma-separated)</span></label>
-            <input name="tags" defaultValue={txn.tags.join(", ")} placeholder="e.g. work, reimbursable, vacation" className="input" />
+            <input
+              ref={tagsRef}
+              name="tags"
+              defaultValue={txn.tags.join(", ")}
+              placeholder="e.g. work, reimbursable, vacation"
+              className="input"
+              autoComplete="off"
+            />
+            {knownTags.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                <span className="text-[11px] text-muted">Reuse:</span>
+                {knownTags.slice(0, 12).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => addTag(t)}
+                    className="chip bg-surface px-2 py-0.5 text-[11px] text-brand ring-1 ring-border transition hover:bg-brand-soft"
+                  >
+                    #{t}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 sm:col-span-2">
             <button type="submit" disabled={pending} className="btn-primary">

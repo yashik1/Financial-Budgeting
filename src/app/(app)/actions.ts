@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { categorize } from "@/lib/categorize";
-import { dollarsToCents } from "@/lib/money";
+import { dollarsToCents, formatCents, safeCurrency } from "@/lib/money";
+
+export async function setUserCurrency(formData: FormData) {
+  const user = await requireUser();
+  const currency = safeCurrency(String(formData.get("currency") || ""));
+  await prisma.user.update({ where: { id: user.id }, data: { currency } });
+  // Money is shown everywhere, so refresh the whole app shell.
+  revalidatePath("/", "layout");
+}
 
 async function ownTransaction(userId: string, id: string) {
   const t = await prisma.transaction.findUnique({ where: { id } });
@@ -69,11 +77,64 @@ export async function recategorizeTransaction(txnId: string, categoryId: string)
   revalidatePath("/dashboard");
 }
 
-export async function setBudgetLimit(categoryId: string, month: string, dollars: string) {
+export type BudgetLimitResult = { ok: boolean; error?: string };
+
+export async function setBudgetLimit(
+  categoryId: string,
+  month: string,
+  dollars: string,
+): Promise<BudgetLimitResult> {
   const user = await requireUser();
   const cat = await prisma.category.findFirst({ where: { id: categoryId, userId: user.id } });
-  if (!cat) return;
+  if (!cat) return { ok: false, error: "Category not found." };
   const limitCents = Math.max(0, dollarsToCents(dollars));
+  const currency = safeCurrency(user.currency);
+
+  if (cat.parentId) {
+    // Subcategory: its siblings' limits, plus this one, can't exceed the parent's.
+    const parentLine = await prisma.budgetLine.findUnique({
+      where: { userId_categoryId_month: { userId: user.id, categoryId: cat.parentId, month } },
+    });
+    const parentLimit = parentLine?.limitCents ?? 0;
+    if (parentLimit > 0) {
+      const siblings = await prisma.category.findMany({
+        where: { userId: user.id, parentId: cat.parentId, id: { not: categoryId } },
+        select: { id: true },
+      });
+      const sibLines = await prisma.budgetLine.findMany({
+        where: { userId: user.id, month, categoryId: { in: siblings.map((s) => s.id) } },
+      });
+      const othersSum = sibLines.reduce((s, l) => s + l.limitCents, 0);
+      if (othersSum + limitCents > parentLimit) {
+        const parent = await prisma.category.findUnique({ where: { id: cat.parentId } });
+        return {
+          ok: false,
+          error: `Subcategories would total ${formatCents(othersSum + limitCents, { currency })}, over the ${
+            parent?.name ?? "parent"
+          } budget of ${formatCents(parentLimit, { currency })}.`,
+        };
+      }
+    }
+  } else if (limitCents > 0) {
+    // Parent: can't set it below what its subcategories already claim.
+    const children = await prisma.category.findMany({
+      where: { userId: user.id, parentId: categoryId },
+      select: { id: true },
+    });
+    if (children.length) {
+      const childLines = await prisma.budgetLine.findMany({
+        where: { userId: user.id, month, categoryId: { in: children.map((c) => c.id) } },
+      });
+      const childSum = childLines.reduce((s, l) => s + l.limitCents, 0);
+      if (childSum > limitCents) {
+        return {
+          ok: false,
+          error: `Its subcategories already total ${formatCents(childSum, { currency })}. Raise this above that, or lower them first.`,
+        };
+      }
+    }
+  }
+
   await prisma.budgetLine.upsert({
     where: { userId_categoryId_month: { userId: user.id, categoryId, month } },
     update: { limitCents },
@@ -81,6 +142,7 @@ export async function setBudgetLimit(categoryId: string, month: string, dollars:
   });
   revalidatePath("/budgets");
   revalidatePath("/dashboard");
+  return { ok: true };
 }
 
 export async function createGoal(formData: FormData) {

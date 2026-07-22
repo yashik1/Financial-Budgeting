@@ -49,7 +49,7 @@ const METRICS: { key: "income" | "spending" | "net"; label: string; higherIsBett
   { key: "net", label: "Saved", higherIsBetter: true, bar: "bg-brand" },
 ];
 
-export function MonthComparison({ data }: { data: Comparison }) {
+export function MonthComparison({ data, currency }: { data: Comparison; currency?: string }) {
   const movers = data.movers.slice(0, 4);
 
   return (
@@ -63,7 +63,7 @@ export function MonthComparison({ data }: { data: Comparison }) {
             <div key={m.key} className="rounded-xl bg-surface-2 p-2.5">
               <p className="text-xs text-muted">{m.label}</p>
               <p className="mt-0.5 text-base font-bold tabular">
-                {formatCents(d.currentCents, { signed: m.key === "net", compact: true })}
+                {formatCents(d.currentCents, { currency, signed: m.key === "net", compact: true })}
               </p>
               <DeltaBars delta={d} color={m.bar} />
               <div className="mt-2">
@@ -91,7 +91,7 @@ export function MonthComparison({ data }: { data: Comparison }) {
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
                   <span className={`tabular text-xs font-semibold ${up ? "text-negative" : "text-positive"}`}>
                     {up ? "+" : "−"}
-                    {formatCents(Math.abs(c.deltaCents), { compact: true })}
+                    {formatCents(Math.abs(c.deltaCents), { currency, compact: true })}
                     <span className="sr-only"> {up ? "more" : "less"} spent than the comparison month</span>
                   </span>
                 </li>
