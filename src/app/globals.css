@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Almanac theme faces — self-hosted, only fetched when the Almanac skin is on
+   (nothing on the Refined skin references them). */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/fraunces.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/caveat.woff2") format("woff2");
+}
+
 /* ------------------------------------------------------------------ */
 /* Design tokens. `R G B` triplets so Tailwind's                       */
 /* `rgb(var(--token) / <alpha-value>)` opacity syntax works.           */
@@ -26,6 +43,10 @@
 
   --shadow-card: 0 1px 2px rgb(30 25 15 / 0.04), 0 8px 24px -12px rgb(30 25 15 / 0.1);
   --shadow-pop: 0 12px 40px -12px rgb(30 25 15 / 0.25);
+
+  /* Almanac theme faces (referenced only under [data-skin="almanac"]). */
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
 }
 
 .dark {
@@ -44,6 +65,67 @@
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.6);
   --shadow-pop: 0 16px 48px -12px rgb(0 0 0 / 0.7);
+}
+
+/* ------------------------------------------------------------------ */
+/* Almanac skin — a warm "money journal" re-skin (Fitch's world).      */
+/* Selectable in Settings; works in light and dark. Refined stays the  */
+/* default, so these only apply under [data-skin="almanac"].           */
+/* ------------------------------------------------------------------ */
+:root[data-skin="almanac"]:not(.dark) {
+  --bg: 244 237 223;
+  --surface: 251 246 236;
+  --surface-2: 239 232 214;
+  --border: 222 209 186;
+  --muted: 101 93 80;
+  --fg: 42 38 32;
+
+  --brand: 30 92 72; /* pine */
+  --brand-soft: 219 231 224;
+  --positive: 44 125 87;
+  --negative: 176 70 53;
+  --warning: 176 116 18;
+  --persimmon: 209 95 54; /* Fitch's fur */
+
+  --shadow-card: 0 1px 2px rgb(60 45 20 / 0.05), 0 10px 26px -14px rgb(60 45 20 / 0.14);
+  --shadow-pop: 0 14px 40px -14px rgb(60 45 20 / 0.3);
+}
+
+:root.dark[data-skin="almanac"] {
+  --bg: 25 27 24;
+  --surface: 33 36 31;
+  --surface-2: 41 44 37;
+  --border: 52 55 47;
+  --muted: 169 158 139;
+  --fg: 236 228 212;
+
+  --brand: 109 191 157;
+  --brand-soft: 42 58 51;
+  --positive: 109 191 157;
+  --negative: 232 138 120;
+  --warning: 230 194 99;
+  --persimmon: 239 138 95;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 26px -14px rgb(0 0 0 / 0.7);
+  --shadow-pop: 0 16px 48px -14px rgb(0 0 0 / 0.75);
+}
+
+/* Almanac gives headings a warm serif and Fitch a handwritten voice. */
+:root[data-skin="almanac"] h1,
+:root[data-skin="almanac"] h2,
+:root[data-skin="almanac"] h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+:root[data-skin="almanac"] .card {
+  border-radius: 0.7rem;
+}
+:root[data-skin="almanac"] .mascot-message {
+  font-family: var(--font-hand);
+  font-size: 1.2rem;
+  line-height: 1.25;
+  color: rgb(var(--persimmon));
 }
 
 * {

@@ -39,7 +39,7 @@ export function MascotCard({
             <span className="font-bold">{mascot.name}</span>
             <span className={cn("chip bg-surface-2", a.text)}>{mascot.mood}</span>
           </div>
-          <p className="mt-1 text-sm text-fg/90">{mascot.message}</p>
+          <p className="mascot-message mt-1 text-sm text-fg/90">{mascot.message}</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="chip bg-warning/10 text-warning">

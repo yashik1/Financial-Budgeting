@@ -51,7 +51,8 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
   the Claude API (`claude-opus-4-8`). Off until you add `ANTHROPIC_API_KEY`.
 - **Couples / shared households** — invite a partner by email to share a combined view (net worth,
   spending, per-person split, shared goals) with **per-account/goal privacy** toggles.
-- **Polish** — light/dark themes, responsive layout, PWA-installable, animated charts.
+- **Themes** — two selectable looks in Settings: **Refined** (clean porcelain + indigo, the default) and **Almanac** (a warm "money journal" — Fraunces serif, pine/persimmon paper palette, and Fitch's messages in his own handwriting). Each works in light and dark.
+- **Polish** — light/dark, responsive layout, PWA-installable, animated charts.
 
 ### Security & data protection
 

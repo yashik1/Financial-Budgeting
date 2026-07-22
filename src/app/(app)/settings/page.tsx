@@ -3,7 +3,8 @@ import { safeCurrency, formatCents } from "@/lib/money";
 import { countryName } from "@/lib/accountTypes";
 import { CurrencyPicker } from "@/components/app/CurrencyPicker";
 import { CountryPicker } from "@/components/app/CountryPicker";
-import { Coins, Globe } from "lucide-react";
+import { ThemePicker } from "@/components/app/ThemePicker";
+import { Coins, Globe, Palette } from "lucide-react";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -15,6 +16,19 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">Settings</h1>
         <p className="text-sm text-muted">Make FinBud yours.</p>
       </header>
+
+      <section className="card space-y-4 p-5" aria-label="Appearance">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand">
+            <Palette className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-bold">Theme</h2>
+            <p className="text-sm text-muted">Pick a look. Each works in light and dark (use the ☀/☾ toggle).</p>
+          </div>
+        </div>
+        <ThemePicker />
+      </section>
 
       <section className="card space-y-4 p-5" aria-label="Currency">
         <div className="flex items-center gap-3">
