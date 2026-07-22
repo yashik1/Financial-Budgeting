@@ -1,17 +1,18 @@
 // FinBud data model.
 //
-// Portability note: dev uses SQLite for zero-setup. To move to Postgres,
-// change `provider` below to "postgresql" and point DATABASE_URL at your DB
-// (docker-compose.yml provides one). The schema avoids Prisma enums and Json
-// and stores all money as integer minor units (cents) so it ports cleanly.
+// Postgres for dev and prod. Local dev uses the docker-compose Postgres
+// (`docker compose up -d db`); production points DATABASE_URL at a managed
+// Postgres (e.g. Railway). The schema avoids Prisma enums and Json and stores
+// all money as integer minor units (cents), so it stays portable.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled connection (app runtime)
+  directUrl = env("DIRECT_URL") // direct connection (migrations); falls back to DATABASE_URL if unset
 }
 
 model User {

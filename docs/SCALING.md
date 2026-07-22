@@ -1,8 +1,9 @@
 # Scaling FinBud — the right database & production setup
 
-FinBud dev runs on **SQLite** for zero-setup. For real users, move to **Postgres** — the
-schema is already portable (money as integer cents, enum-like fields as strings), so this
-is a config change, not a rewrite.
+FinBud runs on **Postgres** everywhere — local dev via the Docker Postgres in
+`docker-compose.yml`, production via a managed instance. Money is stored as integer cents
+and enum-like fields as strings, so the data model scales cleanly. For a hosted deploy, the
+quickest path is [`DEPLOY-RAILWAY.md`](./DEPLOY-RAILWAY.md); the notes below apply to any host.
 
 ## 1. Pick a managed Postgres
 

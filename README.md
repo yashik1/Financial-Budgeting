@@ -64,7 +64,7 @@ carries security headers. Full posture + production checklist + compliance notes
 
 - **Next.js 15** (App Router, Server Components, Server Actions) + **TypeScript**
 - **Tailwind CSS** design system (CSS-variable theming, light/dark)
-- **Prisma** ORM — **SQLite** in dev (zero-setup), **Postgres** in prod
+- **Prisma** ORM on **Postgres** (versioned migrations; Docker Postgres for local dev)
 - **Recharts** for charts, **Framer Motion** / CSS for motion, **lucide-react** icons
 - Cookie session auth via **jose** (swappable for Auth.js/OAuth)
 - **Vitest** unit tests for the pure domain logic
@@ -74,10 +74,18 @@ carries security headers. Full posture + production checklist + compliance notes
 ## Quick start
 
 ```bash
-cp .env.example .env        # SQLite + a dev AUTH_SECRET are pre-filled
+cp .env.example .env        # then set AUTH_SECRET + ENCRYPTION_KEY (see below)
+docker compose up -d db     # start local Postgres (matches the .env URL)
 npm install
-npm run setup               # prisma generate + db push + seed demo data
+npm run setup               # prisma generate + migrate deploy + seed demo data
 npm run dev                 # http://localhost:3000
+```
+
+Generate the two required secrets and paste them into `.env`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # AUTH_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # ENCRYPTION_KEY
 ```
 
 Then click **“Try the demo — no signup”** to explore a fully-populated household
@@ -171,14 +179,16 @@ changes when you switch:
 
 ---
 
-## Using Postgres (production)
+## Deploy
 
-```bash
-docker compose up -d                       # starts Postgres on :5432
-# in prisma/schema.prisma: set datasource provider = "postgresql"
-# in .env: DATABASE_URL=postgresql://finbud:finbud@localhost:5432/finbud?schema=public
-npm run setup
-```
+FinBud runs on Postgres and applies migrations automatically on each deploy
+(`prisma migrate deploy` via the `start:migrate` script / `railway.json`).
+
+- **Railway** (recommended): step-by-step in [`docs/DEPLOY-RAILWAY.md`](./docs/DEPLOY-RAILWAY.md)
+  — add a Postgres plugin, set env vars, deploy.
+- **Anywhere else**: any host that runs a Node server + Postgres works. Set `DATABASE_URL`
+  (and `DIRECT_URL`), `AUTH_SECRET`, `ENCRYPTION_KEY`, run `prisma migrate deploy`, then
+  `next start`. See [`docs/SCALING.md`](./docs/SCALING.md) for pooling and indexing.
 
 ---
 
