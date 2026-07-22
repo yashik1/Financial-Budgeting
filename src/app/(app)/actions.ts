@@ -11,6 +11,51 @@ async function ownTransaction(userId: string, id: string) {
   return t && t.userId === userId ? t : null;
 }
 
+export async function addSubcategory(formData: FormData) {
+  const user = await requireUser();
+  const parentId = String(formData.get("parentId") || "");
+  const name = String(formData.get("name") || "").trim();
+  const icon = String(formData.get("icon") || "").trim() || "•";
+  if (!name) return;
+  const parent = await prisma.category.findFirst({ where: { id: parentId, userId: user.id } });
+  if (!parent) return;
+  const exists = await prisma.category.findFirst({ where: { userId: user.id, name } });
+  if (exists) return; // names are unique per user
+  await prisma.category.create({
+    data: { userId: user.id, name, icon, color: parent.color, group: parent.group, parentId: parent.id, sort: 100 },
+  });
+  revalidatePath("/budgets");
+  revalidatePath("/transactions");
+}
+
+export async function updateTransaction(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") || "");
+  const t = await ownTransaction(user.id, id);
+  if (!t) return;
+  const merchant = String(formData.get("merchant") || "").trim() || t.merchant;
+  const notesRaw = String(formData.get("notes") || "").trim();
+  const flow = String(formData.get("flow") || (t.amountCents >= 0 ? "in" : "out"));
+  const amountStr = String(formData.get("amount") || "");
+  const magnitude = amountStr ? Math.abs(dollarsToCents(amountStr)) : Math.abs(t.amountCents);
+  const amountCents = flow === "in" ? magnitude : -magnitude;
+  const dateStr = String(formData.get("date") || "");
+  const date = dateStr ? new Date(dateStr) : t.date;
+  await prisma.transaction.update({
+    where: { id },
+    data: { merchant, notes: notesRaw || null, amountCents, date },
+  });
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteTransaction(id: string) {
+  const user = await requireUser();
+  await prisma.transaction.deleteMany({ where: { id, userId: user.id } });
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
 export async function recategorizeTransaction(txnId: string, categoryId: string) {
   const user = await requireUser();
   if (!(await ownTransaction(user.id, txnId))) return;

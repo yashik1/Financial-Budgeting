@@ -3,40 +3,45 @@
 @tailwind utilities;
 
 /* ------------------------------------------------------------------ */
-/* Design tokens. Values are `R G B` triplets so Tailwind's            */
+/* Design tokens. `R G B` triplets so Tailwind's                       */
 /* `rgb(var(--token) / <alpha-value>)` opacity syntax works.           */
+/* Direction: neutral foundation, one precise accent, high-contrast    */
+/* numbers, soft depth, minimal borders (2026 fintech).                */
 /* ------------------------------------------------------------------ */
 :root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-
-  --bg: 247 247 251;
+  --bg: 247 248 250;
   --surface: 255 255 255;
-  --surface-2: 244 244 249;
-  --border: 228 228 238;
-  --muted: 110 112 130;
-  --fg: 22 23 38;
+  --surface-2: 241 243 246;
+  --border: 228 231 237;
+  --muted: 108 116 131;
+  --fg: 18 21 28;
 
-  --brand: 99 91 255; /* indigo-violet */
-  --brand-soft: 232 231 255;
-  --positive: 22 163 116; /* emerald */
-  --negative: 225 76 96; /* rose */
-  --warning: 217 148 40; /* amber */
+  --brand: 88 80 236; /* refined indigo */
+  --brand-soft: 235 234 253;
+  --positive: 22 163 116;
+  --negative: 222 68 90;
+  --warning: 200 132 22;
+
+  --shadow-card: 0 1px 2px rgb(16 20 30 / 0.05), 0 6px 20px -10px rgb(16 20 30 / 0.12);
+  --shadow-pop: 0 12px 40px -12px rgb(16 20 30 / 0.28);
 }
 
 .dark {
-  --bg: 13 14 22;
-  --surface: 22 24 35;
-  --surface-2: 30 32 46;
-  --border: 42 45 63;
-  --muted: 148 151 173;
-  --fg: 236 237 247;
+  --bg: 11 12 16;
+  --surface: 20 22 29;
+  --surface-2: 28 31 40;
+  --border: 39 43 54;
+  --muted: 152 158 173;
+  --fg: 232 234 242;
 
-  --brand: 138 132 255;
-  --brand-soft: 39 38 66;
+  --brand: 139 132 255;
+  --brand-soft: 40 39 66;
   --positive: 52 199 149;
   --negative: 247 111 130;
   --warning: 240 180 78;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.6);
+  --shadow-pop: 0 16px 48px -12px rgb(0 0 0 / 0.7);
 }
 
 * {
@@ -52,15 +57,20 @@ body {
   color: rgb(var(--fg));
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  letter-spacing: -0.005em;
 }
 
-/* Numbers align nicely in tables/amounts */
+/* Headings: tighter tracking for a refined, modern-classic feel. */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Tabular, aligned figures — numbers are the hero in finance UIs. */
 .tabular {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
+  font-feature-settings: "tnum", "cv01";
 }
 
-/* Thin, unobtrusive scrollbars */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -76,17 +86,18 @@ body {
   background-clip: content-box;
 }
 
-/* Reusable component classes */
 @layer components {
   .card {
-    @apply rounded-2xl border border-border bg-surface shadow-card;
+    @apply rounded-2xl border border-border bg-surface;
+    box-shadow: var(--shadow-card);
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 disabled:opacity-50;
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2
+           focus-visible:ring-offset-bg disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand text-white hover:brightness-110 active:brightness-95;
+    @apply btn bg-brand text-white shadow-sm hover:brightness-[1.07] active:brightness-95;
   }
   .btn-ghost {
     @apply btn border border-border bg-surface text-fg hover:bg-surface-2;
@@ -96,9 +107,14 @@ body {
   }
   .input {
     @apply w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-fg
-           placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50;
+           placeholder:text-muted transition focus:outline-none focus-visible:border-brand/40
+           focus-visible:ring-2 focus-visible:ring-brand/30;
   }
   .label {
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
+  }
+  /* Big money figures on stat tiles / heroes. */
+  .figure {
+    @apply text-2xl font-extrabold tabular tracking-tight;
   }
 }

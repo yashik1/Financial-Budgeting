@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { CATEGORIES, DEFAULT_RULES } from "../src/lib/categories";
+import { CATEGORIES, SUBCATEGORIES, DEFAULT_RULES } from "../src/lib/categories";
 import { categorize } from "../src/lib/categorize";
 import { generateDemoFinancials } from "../src/lib/aggregation/demo";
 import { currentMonthKey, monthKey } from "../src/lib/dates";
@@ -55,6 +55,23 @@ async function main() {
     categoryByName.set(c.name, created.id);
   }
   const uncategorizedId = categoryByName.get("Uncategorized")!;
+
+  // Subcategories (nested under a parent)
+  for (const s of SUBCATEGORIES) {
+    const parent = CATEGORIES.find((c) => c.name === s.parent);
+    const sub = await prisma.category.create({
+      data: {
+        userId: user.id,
+        name: s.name,
+        group: parent?.group ?? "Essentials",
+        icon: s.icon,
+        color: parent?.color ?? "#635BFF",
+        parentId: categoryByName.get(s.parent) ?? null,
+        sort: 100,
+      },
+    });
+    categoryByName.set(s.name, sub.id);
+  }
 
   // Rules (persisted so the app can re-run categorization + users can add more)
   await prisma.rule.createMany({

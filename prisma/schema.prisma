@@ -75,12 +75,18 @@ model Category {
   isIncome Boolean @default(false)
   sort     Int     @default(0)
 
+  // Optional parent for subcategories (e.g. Transportation → Oil change, Tires).
+  parentId String?
+  parent   Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  children Category[] @relation("Subcategories")
+
   transactions Transaction[]
   budgetLines  BudgetLine[]
   rules        Rule[]
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([parentId])
 }
 
 model Account {

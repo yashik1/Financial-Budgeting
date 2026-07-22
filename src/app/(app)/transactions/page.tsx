@@ -2,8 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getTransactions } from "@/lib/queries";
-import { formatCents } from "@/lib/money";
-import { CategorySelect } from "@/components/app/CategorySelect";
+import { TransactionItem } from "@/components/app/TransactionItem";
+import type { CatOption } from "@/components/app/CategorySelect";
 import { Upload, Search } from "lucide-react";
 
 export default async function TransactionsPage({
@@ -20,7 +20,7 @@ export default async function TransactionsPage({
     prisma.account.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
   ]);
 
-  const catOptions = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon }));
+  const catOptions: CatOption[] = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, parentId: c.parentId }));
 
   return (
     <div className="space-y-5">
@@ -68,22 +68,22 @@ export default async function TransactionsPage({
       <div className="card overflow-hidden">
         <div className="divide-y divide-border">
           {txns.map((t) => (
-            <div key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-surface-2/50">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: `${t.category?.color ?? "#7A879C"}22` }}>
-                {t.category?.icon ?? "❓"}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{t.merchant}</div>
-                <div className="truncate text-xs text-muted">
-                  {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {t.account.name}
-                  {t.isTransfer && <span className="ml-1 chip bg-surface-2 text-muted">transfer</span>}
-                </div>
-              </div>
-              <CategorySelect txnId={t.id} value={t.categoryId} categories={catOptions} />
-              <div className={`w-24 shrink-0 text-right font-semibold tabular ${t.amountCents >= 0 ? "text-positive" : "text-fg"}`}>
-                {formatCents(t.amountCents, { signed: true })}
-              </div>
-            </div>
+            <TransactionItem
+              key={t.id}
+              categories={catOptions}
+              txn={{
+                id: t.id,
+                merchant: t.merchant,
+                dateISO: new Date(t.date).toISOString(),
+                amountCents: t.amountCents,
+                categoryId: t.categoryId,
+                categoryIcon: t.category?.icon ?? "❓",
+                categoryColor: t.category?.color ?? "#7A879C",
+                accountName: t.account.name,
+                isTransfer: t.isTransfer,
+                notes: t.notes,
+              }}
+            />
           ))}
           {txns.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-muted">No transactions match your filters.</p>

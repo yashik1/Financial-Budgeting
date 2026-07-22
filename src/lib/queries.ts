@@ -6,6 +6,7 @@ import {
   budgetSummary,
   healthScore,
   netCashFlow,
+  rollUpSpend,
   spendingByCategory,
   totalIncome,
   totalSpending,
@@ -19,12 +20,20 @@ import {
   mascot,
 } from "./gamification";
 
-export type CategoryMeta = { id: string; name: string; icon: string; color: string; group: string };
+export type CategoryMeta = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  group: string;
+  parentId: string | null;
+};
 
 export async function getCategoryMap(userId: string): Promise<Map<string, CategoryMeta>> {
   const cats = await prisma.category.findMany({ where: { userId } });
   const map = new Map<string, CategoryMeta>();
-  for (const c of cats) map.set(c.id, { id: c.id, name: c.name, icon: c.icon, color: c.color, group: c.group });
+  for (const c of cats)
+    map.set(c.id, { id: c.id, name: c.name, icon: c.icon, color: c.color, group: c.group, parentId: c.parentId });
   return map;
 }
 
@@ -61,17 +70,22 @@ export async function getMonthOverview(userId: string, month: string = currentMo
   const incomeCents = totalIncome(asTxn);
   const spendingCents = totalSpending(asTxn);
   const netCents = netCashFlow(asTxn);
-  const spendByCat = spendingByCategory(asTxn);
+  const spendByCat = spendingByCategory(asTxn); // exact (leaf) spend per category
+
+  // Roll subcategory spend up to parents, so a parent budget includes its subs.
+  const parentOf = new Map<string, string | null>();
+  for (const c of catMap.values()) parentOf.set(c.id, c.parentId);
+  const { rolled: rolledSpend, byTopLevel } = rollUpSpend(spendByCat, parentOf);
 
   const progress = budgetProgress(
     budgetLines.map((l) => ({ categoryId: l.categoryId, limitCents: l.limitCents })),
-    spendByCat,
+    rolledSpend,
   );
   const summary = budgetSummary(progress);
   const health = healthScore({ incomeCents, spendingCents, budget: summary });
 
-  // Spending broken down by category, with display metadata, largest first.
-  const categorySpend = [...spendByCat.entries()]
+  // Overview donut: bucket spending by top-level category (subs roll up).
+  const categorySpend = [...byTopLevel.entries()]
     .map(([id, cents]) => {
       const meta = catMap.get(id);
       return {
@@ -84,7 +98,7 @@ export async function getMonthOverview(userId: string, month: string = currentMo
     })
     .sort((a, b) => b.cents - a.cents);
 
-  return { month, txns, budgetLines, catMap, incomeCents, spendingCents, netCents, spendByCat, progress, summary, health, categorySpend };
+  return { month, txns, budgetLines, catMap, incomeCents, spendingCents, netCents, spendByCat, rolledSpend, progress, summary, health, categorySpend };
 }
 
 export async function getNetWorthTrend(userId: string, months = 6) {
@@ -199,27 +213,64 @@ export async function getTransactions(
   return txns;
 }
 
+export type BudgetRow = {
+  categoryId: string;
+  name: string;
+  icon: string;
+  color: string;
+  limitCents: number;
+  spentCents: number; // rolled (includes subcategories)
+  remainingCents: number;
+  pct: number;
+  over: boolean;
+};
+
+export type BudgetGroup = { parent: BudgetRow; children: BudgetRow[] };
+
 export async function getBudgetView(userId: string, month: string = currentMonthKey()) {
   const overview = await getMonthOverview(userId, month);
-  const rows = overview.budgetLines
-    .map((line) => {
-      const meta = overview.catMap.get(line.categoryId);
-      const spent = overview.spendByCat.get(line.categoryId) ?? 0;
-      return {
-        id: line.id,
-        categoryId: line.categoryId,
-        name: meta?.name ?? "Category",
-        icon: meta?.icon ?? "💸",
-        color: meta?.color ?? "#635BFF",
-        limitCents: line.limitCents,
-        spentCents: spent,
-        remainingCents: line.limitCents - spent,
-        pct: line.limitCents > 0 ? (spent / line.limitCents) * 100 : 0,
-        over: spent > line.limitCents,
-      };
-    })
-    .sort((a, b) => b.pct - a.pct);
-  return { month, rows, summary: overview.summary, incomeCents: overview.incomeCents };
+  const limitByCat = new Map(overview.budgetLines.map((l) => [l.categoryId, l.limitCents]));
+
+  const rowFor = (c: CategoryMeta): BudgetRow => {
+    const limitCents = limitByCat.get(c.id) ?? 0;
+    const spentCents = overview.rolledSpend.get(c.id) ?? 0;
+    return {
+      categoryId: c.id,
+      name: c.name,
+      icon: c.icon,
+      color: c.color,
+      limitCents,
+      spentCents,
+      remainingCents: limitCents - spentCents,
+      pct: limitCents > 0 ? (spentCents / limitCents) * 100 : 0,
+      over: limitCents > 0 && spentCents > limitCents,
+    };
+  };
+
+  const cats = [...overview.catMap.values()].filter((c) => c.group !== "Income");
+  const childrenByParent = new Map<string, CategoryMeta[]>();
+  for (const c of cats) {
+    if (!c.parentId) continue;
+    const list = childrenByParent.get(c.parentId) ?? [];
+    list.push(c);
+    childrenByParent.set(c.parentId, list);
+  }
+
+  const groups: BudgetGroup[] = cats
+    .filter((c) => !c.parentId)
+    .map((p) => ({
+      parent: rowFor(p),
+      children: (childrenByParent.get(p.id) ?? [])
+        .map(rowFor)
+        .sort((a, b) => b.spentCents - a.spentCents),
+    }))
+    .sort((a, b) => {
+      // Budgeted or active groups first, then by spend.
+      const score = (g: BudgetGroup) => (g.parent.limitCents > 0 ? 1_000_000 : 0) + g.parent.spentCents;
+      return score(b) - score(a);
+    });
+
+  return { month, groups, summary: overview.summary, incomeCents: overview.incomeCents };
 }
 
 export async function getGoals(userId: string) {

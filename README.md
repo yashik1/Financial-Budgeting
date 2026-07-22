@@ -33,8 +33,8 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
 
 - **Dashboard** — net-worth trend, cash-flow (income vs spending), spending-by-category
   donut, budget progress, financial-health score, and the mascot with your streak + monthly challenge.
-- **Transactions** — filter/search and **one-tap recategorization**; auto-categorized on import.
-- **Budgets** — envelope budgeting with inline-editable monthly limits and live progress.
+- **Transactions** — filter/search, one-tap (sub)categorization, and inline **edit + notes + delete**; auto-categorized on import.
+- **Budgets** — envelope budgeting with **categories & subcategories** (e.g. Transportation → Gas, Oil Change, Tires — add your own), inline-editable limits, parent roll-ups, and live progress.
 - **Goals** — create, fund, and track savings goals.
 - **Accounts** — grouped by institution; add manually, load demo accounts, or **import CSV/OFV**.
 - **CSV import** — upload a bank/brokerage export, map columns (single-amount or debit/credit),

@@ -7,6 +7,7 @@ import {
   budgetProgress,
   budgetSummary,
   healthScore,
+  rollUpSpend,
   type Txn,
 } from "@/lib/budget";
 
@@ -49,6 +50,28 @@ describe("budget math", () => {
     const summary = budgetSummary(progress);
     expect(summary.budgetedCents).toBe(206_000);
     expect(summary.overCount).toBe(1);
+  });
+
+  it("rolls subcategory spend up to parents and top level", () => {
+    // Transportation → Gas, Oil Change; Groceries (top-level, no children)
+    const parentOf = new Map<string, string | null>([
+      ["transport", null],
+      ["gas", "transport"],
+      ["oil", "transport"],
+      ["groceries", null],
+    ]);
+    const exact = new Map<string, number>([
+      ["gas", 5_000],
+      ["oil", 3_000],
+      ["groceries", 8_000],
+    ]);
+    const { rolled, byTopLevel } = rollUpSpend(exact, parentOf);
+    expect(rolled.get("gas")).toBe(5_000);
+    expect(rolled.get("transport")).toBe(8_000); // gas + oil
+    expect(rolled.get("groceries")).toBe(8_000);
+    expect(byTopLevel.get("transport")).toBe(8_000); // both subs bucket to parent
+    expect(byTopLevel.get("groceries")).toBe(8_000);
+    expect(byTopLevel.has("gas")).toBe(false);
   });
 
   it("health score rewards saving and budget adherence", () => {

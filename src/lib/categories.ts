@@ -61,6 +61,16 @@ export const CATEGORIES: CategorySeed[] = [
   { name: "Uncategorized", group: "Other", icon: "❓", color: PALETTE.slate },
 ];
 
+// Starter subcategories (parent name → sub). Users can add their own too.
+export const SUBCATEGORIES: { parent: string; name: string; icon: string }[] = [
+  { parent: "Transportation", name: "Gas", icon: "⛽" },
+  { parent: "Transportation", name: "Rideshare", icon: "🚕" },
+  { parent: "Transportation", name: "Parking", icon: "🅿️" },
+  { parent: "Transportation", name: "Public Transit", icon: "🚈" },
+  { parent: "Transportation", name: "Oil Change", icon: "🛢️" },
+  { parent: "Transportation", name: "Tires", icon: "🛞" },
+];
+
 // Ordered lowest→highest priority is implied by array order (later wins on ties
 // only if priority equal; the engine sorts by longest match then priority).
 export const DEFAULT_RULES: { matcher: string; category: string }[] = [
@@ -89,13 +99,19 @@ export const DEFAULT_RULES: { matcher: string; category: string }[] = [
   { matcher: "restaurant", category: "Dining & Takeout" },
   { matcher: "pizza", category: "Dining & Takeout" },
   { matcher: "sushi", category: "Dining & Takeout" },
-  { matcher: "uber", category: "Transportation" },
-  { matcher: "lyft", category: "Transportation" },
-  { matcher: "shell", category: "Transportation" },
-  { matcher: "chevron", category: "Transportation" },
-  { matcher: "exxon", category: "Transportation" },
-  { matcher: "parking", category: "Transportation" },
-  { matcher: "transit", category: "Transportation" },
+  { matcher: "uber", category: "Rideshare" },
+  { matcher: "lyft", category: "Rideshare" },
+  { matcher: "shell", category: "Gas" },
+  { matcher: "chevron", category: "Gas" },
+  { matcher: "exxon", category: "Gas" },
+  { matcher: "gas station", category: "Gas" },
+  { matcher: "parking", category: "Parking" },
+  { matcher: "transit", category: "Public Transit" },
+  { matcher: "oil change", category: "Oil Change" },
+  { matcher: "jiffy lube", category: "Oil Change" },
+  { matcher: "valvoline", category: "Oil Change" },
+  { matcher: "discount tire", category: "Tires" },
+  { matcher: "tire", category: "Tires" },
   { matcher: "netflix", category: "Subscriptions" },
   { matcher: "spotify", category: "Subscriptions" },
   { matcher: "hulu", category: "Subscriptions" },
