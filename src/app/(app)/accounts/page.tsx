@@ -1,23 +1,26 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
 import { getAccountsOverview } from "@/lib/queries";
-import { formatCents } from "@/lib/money";
+import { formatCents, safeCurrency } from "@/lib/money";
+import { accountTypeLabel } from "@/lib/accountTypes";
 import { addManualAccount, addDemoAccounts } from "@/app/(app)/actions";
+import { isPlaidEnabled } from "@/lib/aggregation/plaid";
+import { isSnapTradeEnabled } from "@/lib/aggregation/snaptrade";
+import { ConnectPanel } from "@/components/app/ConnectPanel";
+import { AccountEditor } from "@/components/app/AccountEditor";
+import { AccountTypeSelect } from "@/components/app/AccountTypeSelect";
 import { cn } from "@/lib/cn";
 import { Upload, Sparkles, PlusCircle } from "lucide-react";
 
-const TYPE_LABEL: Record<string, string> = {
-  checking: "Checking",
-  savings: "Savings",
-  credit: "Credit card",
-  investment: "Investment",
-  cash: "Cash",
-  loan: "Loan",
-};
-
 export default async function AccountsPage() {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const { accounts, assetsCents, liabilitiesCents, netWorthCents } = await getAccountsOverview(user.id);
+  const [plaidCount, snapConn] = await Promise.all([
+    prisma.plaidItem.count({ where: { userId: user.id } }),
+    prisma.snapTradeConnection.findUnique({ where: { userId: user.id } }),
+  ]);
 
   const byInstitution = new Map<string, typeof accounts>();
   for (const a of accounts) {
@@ -40,15 +43,15 @@ export default async function AccountsPage() {
       <div className="card grid grid-cols-3 gap-4 p-5">
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Assets</div>
-          <div className="text-xl font-extrabold tabular text-positive">{formatCents(assetsCents)}</div>
+          <div className="text-xl font-extrabold tabular text-positive">{formatCents(assetsCents, { currency })}</div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Liabilities</div>
-          <div className="text-xl font-extrabold tabular text-negative">{formatCents(liabilitiesCents)}</div>
+          <div className="text-xl font-extrabold tabular text-negative">{formatCents(liabilitiesCents, { currency })}</div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Net worth</div>
-          <div className="text-xl font-extrabold tabular">{formatCents(netWorthCents)}</div>
+          <div className="text-xl font-extrabold tabular">{formatCents(netWorthCents, { currency })}</div>
         </div>
       </div>
 
@@ -64,15 +67,31 @@ export default async function AccountsPage() {
             </div>
             <div className="divide-y divide-border">
               {list.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+                <div key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="h-8 w-1.5 rounded-full" style={{ background: a.color }} />
-                  <div>
+                  <div className="min-w-0">
                     <div className="font-medium">{a.name}</div>
-                    <div className="text-xs text-muted">{TYPE_LABEL[a.type] ?? a.type} ···· {a.mask}</div>
+                    <div className="text-xs text-muted">
+                      {accountTypeLabel(a)} ···· {a.mask}
+                      {a.country ? ` · ${a.country}` : ""}
+                    </div>
                   </div>
                   <div className={cn("ml-auto text-right font-semibold tabular", a.balanceCents < 0 ? "text-negative" : "text-fg")}>
-                    {formatCents(a.balanceCents)}
+                    {formatCents(a.balanceCents, { currency })}
                   </div>
+                  <AccountEditor
+                    account={{
+                      id: a.id,
+                      name: a.name,
+                      institution: a.institution,
+                      type: a.type,
+                      subtype: a.subtype,
+                      country: a.country,
+                      balanceCents: a.balanceCents,
+                      currency: a.currency,
+                      shared: a.shared,
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -88,7 +107,22 @@ export default async function AccountsPage() {
         )}
       </div>
 
-      {/* Add account */}
+      {/* Connect real institutions (sandbox-ready) */}
+      <div>
+        <h2 className="mb-1 text-lg font-bold">Connect your institutions</h2>
+        <p className="mb-3 text-sm text-muted">
+          Same provider interface, real data. Sandbox works with free keys — see the README.
+          {!isPlaidEnabled() && !isSnapTradeEnabled() && " Add keys to .env to turn these on."}
+        </p>
+        <ConnectPanel
+          plaidEnabled={isPlaidEnabled()}
+          snapEnabled={isSnapTradeEnabled()}
+          hasPlaidItems={plaidCount > 0}
+          hasSnapConn={!!snapConn}
+        />
+      </div>
+
+      {/* Add account manually / demo */}
       <div className="grid gap-4 lg:grid-cols-2">
         <form action={addManualAccount} className="card space-y-3 p-5">
           <div className="flex items-center gap-2 font-bold"><PlusCircle className="h-4 w-4 text-brand" /> Add an account manually</div>
@@ -97,40 +131,31 @@ export default async function AccountsPage() {
               <label className="label" htmlFor="name">Account name</label>
               <input id="name" name="name" className="input" placeholder="Everyday Checking" required />
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="label" htmlFor="institution">Institution</label>
               <input id="institution" name="institution" className="input" placeholder="Chase" />
             </div>
-            <div>
-              <label className="label" htmlFor="type">Type</label>
-              <select id="type" name="type" className="input">
-                <option value="checking">Checking</option>
-                <option value="savings">Savings</option>
-                <option value="credit">Credit card</option>
-                <option value="investment">Investment</option>
-                <option value="cash">Cash</option>
-                <option value="loan">Loan</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="label" htmlFor="balance">Current balance ($)</label>
-              <input id="balance" name="balance" inputMode="decimal" className="input" placeholder="1000" />
-            </div>
+          </div>
+          <AccountTypeSelect idPrefix="add" country={user.country} type="checking" subtype={null} />
+          <div>
+            <label className="label" htmlFor="balance">Current balance</label>
+            <input id="balance" name="balance" inputMode="decimal" className="input" placeholder="1000" />
           </div>
           <button className="btn-primary w-full">Add account</button>
         </form>
 
         <div className="card space-y-3 p-5">
-          <div className="font-bold">Connect the real thing (coming soon)</div>
+          <div className="font-bold">One interface, every source</div>
           <p className="text-sm text-muted">
-            FinBud is built around a single provider interface. Today it runs on demo data and CSV import.
-            Plaid (banks & cards) and SnapTrade (brokerages & crypto) plug into the same seam — no rewrite,
-            just API keys.
+            Demo, CSV, manual, Plaid, and SnapTrade all implement the same
+            <code className="mx-1 rounded bg-surface-2 px-1">AggregationProvider</code>
+            seam — so nothing about the app changes when you switch sources.
           </p>
           <div className="flex flex-wrap gap-2">
             <span className="chip bg-surface-2 text-muted">🏦 Plaid — banks</span>
             <span className="chip bg-surface-2 text-muted">📈 SnapTrade — brokers</span>
-            <span className="chip bg-surface-2 text-muted">📄 CSV / OFX — today</span>
+            <span className="chip bg-surface-2 text-muted">📄 CSV / OFX</span>
+            <span className="chip bg-surface-2 text-muted">✍️ Manual</span>
           </div>
           <form action={addDemoAccounts}>
             <button className="btn-ghost w-full"><Sparkles className="h-4 w-4" /> Add sample demo accounts</button>

@@ -35,7 +35,8 @@ const config: Config = {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12)",
+        card: "var(--shadow-card)",
+        pop: "var(--shadow-pop)",
         glow: "0 0 0 1px rgb(var(--brand) / 0.25), 0 12px 32px -12px rgb(var(--brand) / 0.45)",
       },
       keyframes: {

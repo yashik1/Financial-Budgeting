@@ -34,6 +34,20 @@ export function addMonthsToKey(key: string, delta: number): string {
   return monthKey(d);
 }
 
+/** True for a well-formed "YYYY-MM" key. */
+export function isMonthKey(input: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(input);
+}
+
+/**
+ * Validate a user-supplied month param, clamping to at most `max` (default the
+ * current month, so the UI can't browse into the future). Falls back to `max`.
+ */
+export function safeMonthKey(input: string | undefined, max: string = currentMonthKey()): string {
+  if (!input || !isMonthKey(input)) return max;
+  return input > max ? max : input;
+}
+
 /** Last `count` month keys, oldest first, ending at (and including) `end`. */
 export function lastMonths(count: number, end: string = currentMonthKey()): string[] {
   const keys: string[] = [];

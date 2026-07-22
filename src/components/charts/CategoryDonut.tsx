@@ -5,7 +5,7 @@ import { formatCents } from "@/lib/money";
 
 type Slice = { id: string; name: string; icon?: string; color: string; cents: number };
 
-function ChartTooltip({ active, payload }: any) {
+function ChartTooltip({ active, payload, currency }: any) {
   if (!active || !payload?.length) return null;
   const s = payload[0].payload as Slice;
   return (
@@ -14,7 +14,7 @@ function ChartTooltip({ active, payload }: any) {
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
         {s.icon} {s.name}
       </div>
-      <div className="mt-0.5 font-bold tabular">{formatCents(s.cents)}</div>
+      <div className="mt-0.5 font-bold tabular">{formatCents(s.cents, { currency })}</div>
     </div>
   );
 }
@@ -28,12 +28,16 @@ export function foldSlices(slices: Slice[], max = 6): Slice[] {
   return [...head, { id: "__other__", name: "Other", icon: "•", color: "#7A879C", cents: otherCents }];
 }
 
-export function CategoryDonut({ data }: { data: Slice[] }) {
+export function CategoryDonut({ data, currency }: { data: Slice[]; currency?: string }) {
   const slices = foldSlices(data);
   const total = slices.reduce((s, x) => s + x.cents, 0);
+  const top = slices[0];
+  const summary = top
+    ? `Spending by category, ${formatCents(total, { currency })} total. Largest: ${top.name} at ${formatCents(top.cents, { currency })}.`
+    : "No spending recorded for this month.";
 
   return (
-    <div className="relative h-48 w-full">
+    <div className="relative h-48 w-full" role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -51,13 +55,13 @@ export function CategoryDonut({ data }: { data: Slice[] }) {
               <Cell key={s.id} fill={s.color} />
             ))}
           </Pie>
-          <Tooltip content={<ChartTooltip />} />
+          <Tooltip content={<ChartTooltip currency={currency} />} />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
         <div className="text-center">
           <div className="text-[11px] uppercase tracking-wide text-muted">Spent</div>
-          <div className="text-lg font-extrabold tabular">{formatCents(total, { compact: true })}</div>
+          <div className="text-lg font-extrabold tabular">{formatCents(total, { currency, compact: true })}</div>
         </div>
       </div>
     </div>

@@ -26,7 +26,7 @@ export function StatTile({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
         {icon && <span className={cn("opacity-80", accentClass)}>{icon}</span>}
       </div>
-      <div className="mt-2 text-2xl font-extrabold tabular">{value}</div>
+      <div className="mt-2 text-[1.7rem] font-extrabold leading-tight tabular tracking-tight">{value}</div>
       {sub && <div className="mt-1 text-xs text-muted">{sub}</div>}
     </div>
   );

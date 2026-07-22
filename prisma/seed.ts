@@ -1,8 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { CATEGORIES, DEFAULT_RULES } from "../src/lib/categories";
+import { CATEGORIES, SUBCATEGORIES, DEFAULT_RULES } from "../src/lib/categories";
 import { categorize } from "../src/lib/categorize";
 import { generateDemoFinancials } from "../src/lib/aggregation/demo";
-import { currentMonthKey, monthKey } from "../src/lib/dates";
+import { currentMonthKey, lastMonths, monthKey } from "../src/lib/dates";
 import { savingsStreak, levelForPoints } from "../src/lib/gamification";
 
 const prisma = new PrismaClient();
@@ -56,6 +56,23 @@ async function main() {
   }
   const uncategorizedId = categoryByName.get("Uncategorized")!;
 
+  // Subcategories (nested under a parent)
+  for (const s of SUBCATEGORIES) {
+    const parent = CATEGORIES.find((c) => c.name === s.parent);
+    const sub = await prisma.category.create({
+      data: {
+        userId: user.id,
+        name: s.name,
+        group: parent?.group ?? "Essentials",
+        icon: s.icon,
+        color: parent?.color ?? "#635BFF",
+        parentId: categoryByName.get(s.parent) ?? null,
+        sort: 100,
+      },
+    });
+    categoryByName.set(s.name, sub.id);
+  }
+
   // Rules (persisted so the app can re-run categorization + users can add more)
   await prisma.rule.createMany({
     data: DEFAULT_RULES.map((r) => ({
@@ -88,6 +105,25 @@ async function main() {
     accountIdByExternal.set(a.externalId, created.id);
   }
 
+  // A few illustrative tags so filtering/chips are alive on first load.
+  const demoTags = (catName: string | null): string[] => {
+    switch (catName) {
+      case "Dining & Takeout":
+        return ["eating-out"];
+      case "Coffee":
+        return ["coffee", "treat"];
+      case "Groceries":
+        return ["essentials"];
+      case "Rideshare":
+      case "Gas":
+        return ["commute"];
+      case "Subscriptions":
+        return ["recurring"];
+      default:
+        return [];
+    }
+  };
+
   await prisma.transaction.createMany({
     data: transactions.map((t) => {
       const catName = categorize(t.rawDescription, DEFAULT_RULES);
@@ -101,21 +137,25 @@ async function main() {
         pending: t.pending,
         isTransfer: t.isTransfer,
         categoryId: catName ? categoryByName.get(catName) ?? uncategorizedId : uncategorizedId,
+        tags: demoTags(catName),
       };
     }),
   });
 
-  // Budget lines for the current month
+  // Budget lines for the last 6 months, so browsing past months stays alive.
   const month = currentMonthKey();
+  const budgetMonths = lastMonths(6, month);
   await prisma.budgetLine.createMany({
-    data: Object.entries(BUDGET_LIMITS)
-      .filter(([name]) => categoryByName.has(name))
-      .map(([name, limitCents]) => ({
-        userId: user.id,
-        categoryId: categoryByName.get(name)!,
-        month,
-        limitCents,
-      })),
+    data: budgetMonths.flatMap((m) =>
+      Object.entries(BUDGET_LIMITS)
+        .filter(([name]) => categoryByName.has(name))
+        .map(([name, limitCents]) => ({
+          userId: user.id,
+          categoryId: categoryByName.get(name)!,
+          month: m,
+          limitCents,
+        })),
+    ),
   });
 
   // Goals
@@ -150,6 +190,14 @@ async function main() {
       savingsStreak: streak,
       longestStreak: Math.max(streak, 5),
     },
+  });
+
+  // Give the demo user a home country and tag the brokerage with a subtype so
+  // the account-type features are alive on first load.
+  await prisma.user.update({ where: { id: user.id }, data: { country: "CA" } });
+  await prisma.account.updateMany({
+    where: { userId: user.id, type: "investment" },
+    data: { subtype: "brokerage", country: "US" },
   });
 
   const unlocked = ["first_budget", "on_budget_month", "saver_20", "investor", "goal_funded"];

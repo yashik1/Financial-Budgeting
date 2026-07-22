@@ -44,6 +44,32 @@ export function spendingByCategory(txns: Txn[]): Map<string, number> {
   return map;
 }
 
+/**
+ * Roll leaf-level spending up a category tree. Each category's spend is added to
+ * itself and every ancestor, so a parent's budget includes its subcategories.
+ * Also returns spend bucketed by top-level ancestor (for a clean overview).
+ */
+export function rollUpSpend(
+  exact: Map<string, number>,
+  parentOf: Map<string, string | null | undefined>,
+): { rolled: Map<string, number>; byTopLevel: Map<string, number> } {
+  const rolled = new Map<string, number>();
+  const byTopLevel = new Map<string, number>();
+  for (const [catId, cents] of exact) {
+    let cur: string | null | undefined = catId;
+    let top = catId;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur)) {
+      seen.add(cur);
+      rolled.set(cur, (rolled.get(cur) ?? 0) + cents);
+      top = cur;
+      cur = parentOf.get(cur);
+    }
+    byTopLevel.set(top, (byTopLevel.get(top) ?? 0) + cents);
+  }
+  return { rolled, byTopLevel };
+}
+
 export type LineProgress = {
   categoryId: string;
   limitCents: number;

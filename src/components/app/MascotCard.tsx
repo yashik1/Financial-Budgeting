@@ -14,10 +14,12 @@ export function MascotCard({
   mascot,
   streak,
   challenge,
+  currency,
 }: {
   mascot: MascotState;
   streak: number;
   challenge: Challenge | null;
+  currency?: string;
 }) {
   const a = ACCENT[mascot.accent];
   return (
@@ -57,7 +59,7 @@ export function MascotCard({
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold">Monthly challenge · {challenge.title}</span>
             <span className="text-muted">
-              {formatCents(challenge.spentCents, { compact: true })} / {formatCents(challenge.targetCents, { compact: true })}
+              {formatCents(challenge.spentCents, { currency, compact: true })} / {formatCents(challenge.targetCents, { currency, compact: true })}
             </span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-border">

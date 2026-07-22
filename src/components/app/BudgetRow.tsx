@@ -12,7 +12,7 @@ export type BudgetRowData = {
   over: boolean;
 };
 
-export function BudgetRow({ row }: { row: BudgetRowData }) {
+export function BudgetRow({ row, currency }: { row: BudgetRowData; currency?: string }) {
   const width = Math.min(100, row.pct);
   const barColor = row.over ? "bg-negative" : row.pct > 85 ? "bg-warning" : "bg-positive";
   const remaining = row.limitCents - row.spentCents;
@@ -25,9 +25,9 @@ export function BudgetRow({ row }: { row: BudgetRowData }) {
         </span>
         <span className="font-medium">{row.name}</span>
         <span className="ml-auto tabular text-muted">
-          <span className="font-semibold text-fg">{formatCents(row.spentCents, { compact: true })}</span>
+          <span className="font-semibold text-fg">{formatCents(row.spentCents, { currency, compact: true })}</span>
           {" / "}
-          {formatCents(row.limitCents, { compact: true })}
+          {formatCents(row.limitCents, { currency, compact: true })}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-surface-2">
@@ -35,8 +35,8 @@ export function BudgetRow({ row }: { row: BudgetRowData }) {
       </div>
       <div className={cn("mt-1 text-[11px]", row.over ? "text-negative" : "text-muted")}>
         {row.over
-          ? `${formatCents(-remaining, { compact: true })} over budget`
-          : `${formatCents(remaining, { compact: true })} left`}
+          ? `${formatCents(-remaining, { currency, compact: true })} over budget`
+          : `${formatCents(remaining, { currency, compact: true })} left`}
       </div>
     </div>
   );

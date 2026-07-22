@@ -1,17 +1,20 @@
 // FinBud data model.
 //
-// Portability note: dev uses SQLite for zero-setup. To move to Postgres,
-// change `provider` below to "postgresql" and point DATABASE_URL at your DB
-// (docker-compose.yml provides one). The schema avoids Prisma enums and Json
-// and stores all money as integer minor units (cents) so it ports cleanly.
+// Postgres for dev and prod. Local dev uses the docker-compose Postgres
+// (`docker compose up -d db`); production points DATABASE_URL at a managed
+// Postgres (e.g. Railway). The schema avoids Prisma enums and Json and stores
+// all money as integer minor units (cents), so it stays portable.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  // If you put a *pooled* URL in DATABASE_URL (e.g. PgBouncer/Neon pooler), add a
+  // direct connection for migrations:  directUrl = env("DIRECT_URL")
+  // Railway's default Postgres is a direct connection, so this isn't needed there.
 }
 
 model User {
@@ -20,6 +23,8 @@ model User {
   name         String
   passwordHash String? // null for the seeded demo user (magic "Try the demo" login)
   isDemo       Boolean  @default(false)
+  currency     String   @default("USD") // ISO 4217 display currency
+  country      String? // ISO 3166-1 alpha-2 default jurisdiction (for account types)
   createdAt    DateTime @default(now())
 
   householdId String?
@@ -33,14 +38,32 @@ model User {
   rules        Rule[]
   achievements Achievement[]
   stats        UserStats?
+  plaidItems   PlaidItem[]
+  snapTrade    SnapTradeConnection?
 }
 
-// Stubbed for the future "couples / shared" phase — unused in v1.
+// A shared household groups members who see each other's (non-private) money.
 model Household {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  members   User[]
+  id          String            @id @default(cuid())
+  name        String
+  createdById String?
+  createdAt   DateTime          @default(now())
+  members     User[]
+  invites     HouseholdInvite[]
+}
+
+// Email invitation to join a household. Accepted by the invitee when logged in.
+model HouseholdInvite {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  email       String // invitee email, lowercased
+  invitedById String
+  status      String    @default("pending") // pending | accepted | declined
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([householdId])
 }
 
 model Category {
@@ -54,12 +77,18 @@ model Category {
   isIncome Boolean @default(false)
   sort     Int     @default(0)
 
+  // Optional parent for subcategories (e.g. Transportation → Oil change, Tires).
+  parentId String?
+  parent   Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  children Category[] @relation("Subcategories")
+
   transactions Transaction[]
   budgetLines  BudgetLine[]
   rules        Rule[]
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([parentId])
 }
 
 model Account {
@@ -67,12 +96,15 @@ model Account {
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
-  type          String // "checking" | "savings" | "credit" | "investment" | "cash" | "loan"
+  type          String // universal kind: checking | savings | credit | investment | cash | loan
+  subtype       String? // product/tax wrapper code (e.g. tfsa, rrsp, 401k, isa) — see lib/accountTypes
+  country       String? // ISO 3166-1 alpha-2 jurisdiction for the subtype
   institution   String
   mask          String   @default("0000") // last 4
   balanceCents  Int      @default(0)
   currency      String   @default("USD")
   isAsset       Boolean  @default(true) // false for credit/loan (liabilities)
+  shared        Boolean  @default(true) // visible to the household? false = private
   color         String   @default("#635BFF")
   providerId    String   @default("demo") // demo | plaid | snaptrade | manual | csv
   externalId    String? // provider's account id (for real aggregation later)
@@ -99,15 +131,19 @@ model Transaction {
   pending        Boolean  @default(false)
   isTransfer     Boolean  @default(false)
   notes          String?
+  tags           String[] @default([]) // free-form labels for filtering
   // Splits: a child references its parent; parent keeps the original amount.
   splitParentId  String?
   splitParent    Transaction?  @relation("Splits", fields: [splitParentId], references: [id])
   splits         Transaction[] @relation("Splits")
+  // Provider transaction id, used to de-duplicate incremental syncs.
+  externalId     String?
   createdAt      DateTime @default(now())
 
   @@index([userId, date])
   @@index([accountId])
   @@index([categoryId])
+  @@index([externalId])
 }
 
 // Envelope / zero-based budgeting: one limit per category per month.
@@ -133,6 +169,7 @@ model Goal {
   targetCents Int
   savedCents  Int      @default(0)
   color      String    @default("#16A374")
+  shared     Boolean   @default(true) // visible to the household? false = private
   deadline   DateTime?
   createdAt  DateTime  @default(now())
 
@@ -173,4 +210,34 @@ model UserStats {
   level          Int    @default(1)
   savingsStreak  Int    @default(0) // consecutive on-budget months
   longestStreak  Int    @default(0)
+}
+
+// ---------------------------------------------------------------------------
+// Real bank/broker connectivity (sandbox-ready). Populated only when provider
+// keys are configured; the app runs on demo + CSV without these.
+// ---------------------------------------------------------------------------
+
+// One Plaid "Item" = one connected bank login (may hold several accounts).
+model PlaidItem {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId      String   @unique
+  // NOTE: store encrypted at rest in production. Plaintext here for sandbox.
+  accessToken String
+  institution String   @default("Bank")
+  cursor      String? // transactionsSync cursor for incremental pulls
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+// SnapTrade registers a user and returns a userSecret used on every call.
+model SnapTradeConnection {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapUserId String
+  userSecret String // treat as a credential — encrypt at rest in production
+  createdAt  DateTime @default(now())
 }

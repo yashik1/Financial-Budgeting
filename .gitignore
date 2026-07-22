@@ -34,3 +34,7 @@ yarn-error.log*
 
 # generated prisma client
 /src/generated
+
+# Local agent skills (installed via 'npx skills add', not part of the app)
+.agents/
+.claude/skills/
