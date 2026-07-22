@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { CATEGORIES, SUBCATEGORIES, DEFAULT_RULES } from "../src/lib/categories";
 import { categorize } from "../src/lib/categorize";
 import { generateDemoFinancials } from "../src/lib/aggregation/demo";
-import { currentMonthKey, monthKey } from "../src/lib/dates";
+import { currentMonthKey, lastMonths, monthKey } from "../src/lib/dates";
 import { savingsStreak, levelForPoints } from "../src/lib/gamification";
 
 const prisma = new PrismaClient();
@@ -105,6 +105,25 @@ async function main() {
     accountIdByExternal.set(a.externalId, created.id);
   }
 
+  // A few illustrative tags so filtering/chips are alive on first load.
+  const demoTags = (catName: string | null): string[] => {
+    switch (catName) {
+      case "Dining & Takeout":
+        return ["eating-out"];
+      case "Coffee":
+        return ["coffee", "treat"];
+      case "Groceries":
+        return ["essentials"];
+      case "Rideshare":
+      case "Gas":
+        return ["commute"];
+      case "Subscriptions":
+        return ["recurring"];
+      default:
+        return [];
+    }
+  };
+
   await prisma.transaction.createMany({
     data: transactions.map((t) => {
       const catName = categorize(t.rawDescription, DEFAULT_RULES);
@@ -118,21 +137,25 @@ async function main() {
         pending: t.pending,
         isTransfer: t.isTransfer,
         categoryId: catName ? categoryByName.get(catName) ?? uncategorizedId : uncategorizedId,
+        tags: demoTags(catName),
       };
     }),
   });
 
-  // Budget lines for the current month
+  // Budget lines for the last 6 months, so browsing past months stays alive.
   const month = currentMonthKey();
+  const budgetMonths = lastMonths(6, month);
   await prisma.budgetLine.createMany({
-    data: Object.entries(BUDGET_LIMITS)
-      .filter(([name]) => categoryByName.has(name))
-      .map(([name, limitCents]) => ({
-        userId: user.id,
-        categoryId: categoryByName.get(name)!,
-        month,
-        limitCents,
-      })),
+    data: budgetMonths.flatMap((m) =>
+      Object.entries(BUDGET_LIMITS)
+        .filter(([name]) => categoryByName.has(name))
+        .map(([name, limitCents]) => ({
+          userId: user.id,
+          categoryId: categoryByName.get(name)!,
+          month: m,
+          limitCents,
+        })),
+    ),
   });
 
   // Goals

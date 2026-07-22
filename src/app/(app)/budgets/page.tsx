@@ -1,9 +1,10 @@
 import { requireUser } from "@/lib/session";
 import { getBudgetView, type BudgetRow } from "@/lib/queries";
 import { formatCents } from "@/lib/money";
-import { monthLabel } from "@/lib/dates";
+import { monthLabel, safeMonthKey } from "@/lib/dates";
 import { BudgetLimitForm } from "@/components/app/BudgetLimitForm";
 import { AddSubcategory } from "@/components/app/AddSubcategory";
+import { MonthSwitcher } from "@/components/app/MonthSwitcher";
 import { cn } from "@/lib/cn";
 
 function Row({ row, month, child }: { row: BudgetRow; month: string; child?: boolean }) {
@@ -35,19 +36,22 @@ function Row({ row, month, child }: { row: BudgetRow; month: string; child?: boo
   );
 }
 
-export default async function BudgetsPage() {
+export default async function BudgetsPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await requireUser();
-  const view = await getBudgetView(user.id);
+  const sp = await searchParams;
+  const month = safeMonthKey(sp.month);
+  const view = await getBudgetView(user.id, month);
   const s = view.summary;
   const leftover = view.incomeCents - s.budgetedCents;
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-2">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Budgets</h1>
-          <p className="text-sm text-muted">Envelope budgeting with subcategories · {monthLabel(view.month)}</p>
+          <p className="text-sm text-muted">Envelope budgeting with subcategories</p>
         </div>
+        <MonthSwitcher month={month} basePath="/budgets" />
       </header>
 
       {/* Summary */}

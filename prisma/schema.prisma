@@ -127,6 +127,7 @@ model Transaction {
   pending        Boolean  @default(false)
   isTransfer     Boolean  @default(false)
   notes          String?
+  tags           String[] @default([]) // free-form labels for filtering
   // Splits: a child references its parent; parent keeps the original amount.
   splitParentId  String?
   splitParent    Transaction?  @relation("Splits", fields: [splitParentId], references: [id])

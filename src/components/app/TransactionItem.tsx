@@ -17,6 +17,7 @@ export type TxnItem = {
   accountName: string;
   isTransfer: boolean;
   notes: string | null;
+  tags: string[];
 };
 
 export function TransactionItem({ txn, categories }: { txn: TxnItem; categories: CatOption[] }) {
@@ -41,6 +42,13 @@ export function TransactionItem({ txn, categories }: { txn: TxnItem; categories:
             {txn.isTransfer && <span className="ml-1 chip bg-surface-2 text-muted">transfer</span>}
           </div>
           {txn.notes && !editing && <div className="mt-0.5 truncate text-xs italic text-muted">“{txn.notes}”</div>}
+          {txn.tags.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {txn.tags.map((t) => (
+                <span key={t} className="chip bg-brand-soft px-2 py-0.5 text-[10px] text-brand">#{t}</span>
+              ))}
+            </div>
+          )}
         </div>
         <CategorySelect txnId={txn.id} value={txn.categoryId} categories={categories} />
         <div className={`w-24 shrink-0 text-right font-semibold tabular ${income ? "text-positive" : "text-fg"}`}>
@@ -85,6 +93,10 @@ export function TransactionItem({ txn, categories }: { txn: TxnItem; categories:
           <div>
             <label className="label">Notes</label>
             <input name="notes" defaultValue={txn.notes ?? ""} placeholder="Add a note…" className="input" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Tags <span className="normal-case text-muted">(comma-separated)</span></label>
+            <input name="tags" defaultValue={txn.tags.join(", ")} placeholder="e.g. work, reimbursable, vacation" className="input" />
           </div>
           <div className="flex items-center gap-2 sm:col-span-2">
             <button type="submit" disabled={pending} className="btn-primary">

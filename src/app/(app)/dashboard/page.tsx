@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
-import { getDashboard, getGoals } from "@/lib/queries";
+import { getDashboard, getGoals, type MoneyDelta } from "@/lib/queries";
 import { formatCents } from "@/lib/money";
-import { monthLabel } from "@/lib/dates";
+import { monthLabel, safeMonthKey } from "@/lib/dates";
 import { StatTile, SectionHeader } from "@/components/ui/StatTile";
 import { MascotCard } from "@/components/app/MascotCard";
+import { MonthSwitcher } from "@/components/app/MonthSwitcher";
+import { MonthComparison } from "@/components/app/MonthComparison";
 import { BudgetRow, type BudgetRowData } from "@/components/app/BudgetRow";
 import { NetWorthChart } from "@/components/charts/NetWorthChart";
 import { CashflowChart } from "@/components/charts/CashflowChart";
@@ -18,10 +20,20 @@ function greeting() {
   return "Good evening";
 }
 
-export default async function DashboardPage() {
+/** Short "▲ 12% vs last mo" sub-label for a stat tile. */
+function deltaSub(d: MoneyDelta): string {
+  if (d.previousCents === 0) return d.currentCents === 0 ? "—" : "new this month";
+  const pct = Math.round((d.deltaCents / Math.abs(d.previousCents)) * 100);
+  if (pct === 0) return "same as last month";
+  return `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}% vs last month`;
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await requireUser();
-  const [dash, goals] = await Promise.all([getDashboard(user.id), getGoals(user.id)]);
-  const { accounts, overview, trend, cashflow, game, mascot, challenge } = dash;
+  const sp = await searchParams;
+  const month = safeMonthKey(sp.month);
+  const [dash, goals] = await Promise.all([getDashboard(user.id, month), getGoals(user.id)]);
+  const { accounts, overview, trend, cashflow, game, mascot, challenge, comparison } = dash;
 
   const budgetRows: BudgetRowData[] = overview.progress
     .map((p) => {
@@ -44,21 +56,24 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-2">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">
             {greeting()}, {firstName} 👋
           </h1>
-          <p className="text-sm text-muted">Here’s your money at a glance · {monthLabel(overview.month)}</p>
+          <p className="text-sm text-muted">Here’s your money at a glance</p>
         </div>
-        <div className="chip bg-brand-soft text-brand">Health score {overview.health}/100</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="chip bg-brand-soft text-brand">Health score {overview.health}/100</span>
+          <MonthSwitcher month={month} basePath="/dashboard" />
+        </div>
       </header>
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Net worth" value={formatCents(accounts.netWorthCents)} accent="brand" icon={<Wallet className="h-4 w-4" />} sub={`${accounts.accounts.length} accounts`} />
-        <StatTile label="Income" value={formatCents(overview.incomeCents)} accent="positive" icon={<TrendingUp className="h-4 w-4" />} sub="this month" />
-        <StatTile label="Spending" value={formatCents(overview.spendingCents)} accent="negative" icon={<TrendingDown className="h-4 w-4" />} sub="this month" />
+        <StatTile label="Income" value={formatCents(overview.incomeCents)} accent="positive" icon={<TrendingUp className="h-4 w-4" />} sub={deltaSub(comparison.income)} />
+        <StatTile label="Spending" value={formatCents(overview.spendingCents)} accent="negative" icon={<TrendingDown className="h-4 w-4" />} sub={deltaSub(comparison.spending)} />
         <StatTile
           label="Saved"
           value={formatCents(overview.netCents, { signed: true })}
@@ -103,6 +118,11 @@ export default async function DashboardPage() {
         {/* Right column */}
         <div className="space-y-6">
           <MascotCard mascot={mascot} streak={game.stats.savingsStreak} challenge={challenge} />
+
+          <section className="card p-5">
+            <SectionHeader title="Monthly insights" hint={monthLabel(overview.month)} />
+            <MonthComparison data={comparison} />
+          </section>
 
           <section className="card p-5">
             <SectionHeader title="Where it went" hint={monthLabel(overview.month)} />

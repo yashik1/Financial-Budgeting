@@ -41,9 +41,14 @@ export async function updateTransaction(formData: FormData) {
   const amountCents = flow === "in" ? magnitude : -magnitude;
   const dateStr = String(formData.get("date") || "");
   const date = dateStr ? new Date(dateStr) : t.date;
+  const tags = String(formData.get("tags") || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 12);
   await prisma.transaction.update({
     where: { id },
-    data: { merchant, notes: notesRaw || null, amountCents, date },
+    data: { merchant, notes: notesRaw || null, amountCents, date, tags },
   });
   revalidatePath("/transactions");
   revalidatePath("/dashboard");

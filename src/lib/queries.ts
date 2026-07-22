@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "./db";
-import { currentMonthKey, lastMonths, monthKey, monthRange } from "./dates";
+import { addMonthsToKey, currentMonthKey, lastMonths, monthKey, monthRange } from "./dates";
 import {
   budgetProgress,
   budgetSummary,
@@ -101,14 +101,18 @@ export async function getMonthOverview(userId: string, month: string = currentMo
   return { month, txns, budgetLines, catMap, incomeCents, spendingCents, netCents, spendByCat, rolledSpend, progress, summary, health, categorySpend };
 }
 
-export async function getNetWorthTrend(userId: string, months = 6) {
-  const keys = lastMonths(months);
+export async function getNetWorthTrend(userId: string, months = 6, endMonth: string = currentMonthKey()) {
+  const keys = lastMonths(months, endMonth);
   const { start } = monthRange(keys[0]);
   const { end } = monthRange(keys[keys.length - 1]);
-  const [txns, overview] = await Promise.all([
+  const [txns, overview, laterFlows] = await Promise.all([
     prisma.transaction.findMany({ where: { userId, date: { gte: start, lte: end }, isTransfer: false } }),
     getAccountsOverview(userId),
+    // Flows after the window's end let us anchor net worth at the selected month
+    // rather than today (matters when browsing a past month).
+    prisma.transaction.aggregate({ where: { userId, isTransfer: false, date: { gt: end } }, _sum: { amountCents: true } }),
   ]);
+  const netWorthAtEnd = overview.netWorthCents - (laterFlows._sum.amountCents ?? 0);
 
   const netByMonth = new Map<string, number>();
   for (const k of keys) netByMonth.set(k, 0);
@@ -117,11 +121,11 @@ export async function getNetWorthTrend(userId: string, months = 6) {
     if (netByMonth.has(k)) netByMonth.set(k, netByMonth.get(k)! + t.amountCents);
   }
   const monthly = keys.map((month) => ({ month, netCents: netByMonth.get(month) ?? 0 }));
-  return netWorthSeries(overview.netWorthCents, monthly);
+  return netWorthSeries(netWorthAtEnd, monthly);
 }
 
-export async function getCashflowTrend(userId: string, months = 6) {
-  const keys = lastMonths(months);
+export async function getCashflowTrend(userId: string, months = 6, endMonth: string = currentMonthKey()) {
+  const keys = lastMonths(months, endMonth);
   const { start } = monthRange(keys[0]);
   const { end } = monthRange(keys[keys.length - 1]);
   const txns = await prisma.transaction.findMany({
@@ -156,15 +160,71 @@ export async function getGamification(userId: string) {
   };
 }
 
-/** Everything the dashboard needs, composed. */
-export async function getDashboard(userId: string) {
-  const [accounts, overview, trend, cashflow, game] = await Promise.all([
+export type MoneyDelta = { currentCents: number; previousCents: number; deltaCents: number };
+export type CategoryMover = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  currentCents: number;
+  previousCents: number;
+  deltaCents: number;
+};
+export type MonthComparison = {
+  month: string;
+  prevMonth: string;
+  income: MoneyDelta;
+  spending: MoneyDelta;
+  net: MoneyDelta;
+  movers: CategoryMover[];
+};
+
+/** This month vs the previous month: headline deltas + biggest category movers. */
+function buildComparison(
+  cur: Awaited<ReturnType<typeof getMonthOverview>>,
+  prev: Awaited<ReturnType<typeof getMonthOverview>>,
+): MonthComparison {
+  const delta = (currentCents: number, previousCents: number): MoneyDelta => ({
+    currentCents,
+    previousCents,
+    deltaCents: currentCents - previousCents,
+  });
+
+  const curByCat = new Map(cur.categorySpend.map((c) => [c.id, c]));
+  const prevByCat = new Map(prev.categorySpend.map((c) => [c.id, c]));
+  const ids = new Set([...curByCat.keys(), ...prevByCat.keys()]);
+  const movers: CategoryMover[] = [...ids]
+    .map((id) => {
+      const meta = curByCat.get(id) ?? prevByCat.get(id)!;
+      const currentCents = curByCat.get(id)?.cents ?? 0;
+      const previousCents = prevByCat.get(id)?.cents ?? 0;
+      return { id, name: meta.name, icon: meta.icon, color: meta.color, currentCents, previousCents, deltaCents: currentCents - previousCents };
+    })
+    .filter((m) => m.deltaCents !== 0)
+    .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents));
+
+  return {
+    month: cur.month,
+    prevMonth: prev.month,
+    income: delta(cur.incomeCents, prev.incomeCents),
+    spending: delta(cur.spendingCents, prev.spendingCents),
+    net: delta(cur.netCents, prev.netCents),
+    movers,
+  };
+}
+
+/** Everything the dashboard needs, composed. Defaults to the current month. */
+export async function getDashboard(userId: string, month: string = currentMonthKey()) {
+  const prevMonth = addMonthsToKey(month, -1);
+  const [accounts, overview, prevOverview, trend, cashflow, game] = await Promise.all([
     getAccountsOverview(userId),
-    getMonthOverview(userId),
-    getNetWorthTrend(userId, 6),
-    getCashflowTrend(userId, 6),
+    getMonthOverview(userId, month),
+    getMonthOverview(userId, prevMonth),
+    getNetWorthTrend(userId, 6, month),
+    getCashflowTrend(userId, 6, month),
     getGamification(userId),
   ]);
+  const comparison = buildComparison(overview, prevOverview);
 
   const mascotState = mascot({
     healthScore: overview.health,
@@ -191,20 +251,48 @@ export async function getDashboard(userId: string) {
     }
   }
 
-  return { accounts, overview, trend, cashflow, game, mascot: mascotState, challenge };
+  return { month, prevMonth, accounts, overview, trend, cashflow, game, mascot: mascotState, challenge, comparison };
 }
 
-export async function getTransactions(
-  userId: string,
-  opts: { categoryId?: string; accountId?: string; search?: string; limit?: number } = {},
-) {
-  const { categoryId, accountId, search, limit = 200 } = opts;
+export type TxnFilters = {
+  categoryId?: string;
+  accountId?: string;
+  accountType?: string; // checking | savings | credit | investment | ...
+  search?: string;
+  tag?: string;
+  type?: "in" | "out" | "transfer";
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
+  limit?: number;
+};
+
+export async function getTransactions(userId: string, opts: TxnFilters = {}) {
+  const { categoryId, accountId, accountType, search, tag, type, from, to, limit = 200 } = opts;
+
+  const typeWhere =
+    type === "in"
+      ? { amountCents: { gt: 0 }, isTransfer: false }
+      : type === "out"
+        ? { amountCents: { lt: 0 }, isTransfer: false }
+        : type === "transfer"
+          ? { isTransfer: true }
+          : {};
+
+  const dateWhere =
+    from || to
+      ? { date: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(`${to}T23:59:59`) } : {}) } }
+      : {};
+
   const txns = await prisma.transaction.findMany({
     where: {
       userId,
       ...(categoryId ? { categoryId } : {}),
       ...(accountId ? { accountId } : {}),
-      ...(search ? { OR: [{ merchant: { contains: search } }, { rawDescription: { contains: search } }] } : {}),
+      ...(accountType ? { account: { type: accountType } } : {}),
+      ...(tag ? { tags: { has: tag } } : {}),
+      ...typeWhere,
+      ...dateWhere,
+      ...(search ? { OR: [{ merchant: { contains: search, mode: "insensitive" } }, { rawDescription: { contains: search, mode: "insensitive" } }] } : {}),
     },
     include: { account: true, category: true },
     orderBy: { date: "desc" },

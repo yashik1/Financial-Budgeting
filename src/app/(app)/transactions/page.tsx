@@ -1,33 +1,66 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { getTransactions } from "@/lib/queries";
+import { getTransactions, type TxnFilters } from "@/lib/queries";
 import { TransactionItem } from "@/components/app/TransactionItem";
 import type { CatOption } from "@/components/app/CategorySelect";
-import { Upload, Search } from "lucide-react";
+import { Upload, Search, X } from "lucide-react";
 
-export default async function TransactionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ category?: string; account?: string; q?: string }>;
-}) {
+const TYPE_LABEL: Record<string, string> = {
+  checking: "Checking",
+  savings: "Savings",
+  credit: "Credit card",
+  investment: "Investment",
+  cash: "Cash",
+  loan: "Loan",
+};
+
+type SP = {
+  category?: string;
+  account?: string;
+  atype?: string;
+  q?: string;
+  tag?: string;
+  type?: string;
+  from?: string;
+  to?: string;
+};
+
+export default async function TransactionsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
   const sp = await searchParams;
 
+  const filters: TxnFilters = {
+    categoryId: sp.category || undefined,
+    accountId: sp.account || undefined,
+    accountType: sp.atype || undefined,
+    search: sp.q || undefined,
+    tag: sp.tag || undefined,
+    type: (sp.type as TxnFilters["type"]) || undefined,
+    from: sp.from || undefined,
+    to: sp.to || undefined,
+    limit: 300,
+  };
+
   const [txns, categories, accounts] = await Promise.all([
-    getTransactions(user.id, { categoryId: sp.category, accountId: sp.account, search: sp.q, limit: 300 }),
+    getTransactions(user.id, filters),
     prisma.category.findMany({ where: { userId: user.id }, orderBy: { sort: "asc" } }),
     prisma.account.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
   ]);
 
   const catOptions: CatOption[] = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, parentId: c.parentId }));
+  const tops = categories.filter((c) => !c.parentId);
+  const childrenOf = new Map<string, typeof categories>();
+  for (const c of categories) if (c.parentId) childrenOf.set(c.parentId, [...(childrenOf.get(c.parentId) ?? []), c]);
+  const accountTypes = [...new Set(accounts.map((a) => a.type))];
+  const activeFilters = Object.values(sp).filter(Boolean).length;
 
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Transactions</h1>
-          <p className="text-sm text-muted">{txns.length} shown · tap a category to recategorize</p>
+          <p className="text-sm text-muted">{txns.length} shown · tap a category to recategorize, ✏️ to edit</p>
         </div>
         <Link href="/accounts/import" className="btn-primary">
           <Upload className="h-4 w-4" /> Import CSV
@@ -35,8 +68,8 @@ export default async function TransactionsPage({
       </header>
 
       {/* Filters */}
-      <form className="card flex flex-wrap items-end gap-3 p-4" method="get">
-        <div className="min-w-[12rem] flex-1">
+      <form className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" method="get">
+        <div className="sm:col-span-2 lg:col-span-1">
           <label className="label" htmlFor="q">Search</label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted" />
@@ -44,13 +77,34 @@ export default async function TransactionsPage({
           </div>
         </div>
         <div>
+          <label className="label" htmlFor="type">Type</label>
+          <select id="type" name="type" defaultValue={sp.type ?? ""} className="input">
+            <option value="">All</option>
+            <option value="out">Expenses</option>
+            <option value="in">Income</option>
+            <option value="transfer">Transfers</option>
+          </select>
+        </div>
+        <div>
           <label className="label" htmlFor="category">Category</label>
           <select id="category" name="category" defaultValue={sp.category ?? ""} className="input">
-            <option value="">All</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-            ))}
+            <option value="">All categories</option>
+            {tops.map((t) => {
+              const kids = childrenOf.get(t.id) ?? [];
+              return (
+                <optgroup key={t.id} label={`${t.icon} ${t.name}`}>
+                  <option value={t.id}>{t.icon} {t.name}</option>
+                  {kids.map((c) => (
+                    <option key={c.id} value={c.id}>&nbsp;&nbsp;{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="tag">Tag</label>
+          <input id="tag" name="tag" defaultValue={sp.tag ?? ""} placeholder="e.g. reimbursable" className="input" />
         </div>
         <div>
           <label className="label" htmlFor="account">Account</label>
@@ -61,7 +115,31 @@ export default async function TransactionsPage({
             ))}
           </select>
         </div>
-        <button className="btn-ghost">Apply</button>
+        <div>
+          <label className="label" htmlFor="atype">Account type</label>
+          <select id="atype" name="atype" defaultValue={sp.atype ?? ""} className="input">
+            <option value="">All</option>
+            {accountTypes.map((t) => (
+              <option key={t} value={t}>{TYPE_LABEL[t] ?? t}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="from">From</label>
+          <input id="from" name="from" type="date" defaultValue={sp.from ?? ""} className="input" />
+        </div>
+        <div>
+          <label className="label" htmlFor="to">To</label>
+          <input id="to" name="to" type="date" defaultValue={sp.to ?? ""} className="input" />
+        </div>
+        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+          <button className="btn-primary">Apply filters</button>
+          {activeFilters > 0 && (
+            <Link href="/transactions" className="btn-ghost">
+              <X className="h-4 w-4" /> Clear ({activeFilters})
+            </Link>
+          )}
+        </div>
       </form>
 
       {/* List */}
@@ -82,6 +160,7 @@ export default async function TransactionsPage({
                 accountName: t.account.name,
                 isTransfer: t.isTransfer,
                 notes: t.notes,
+                tags: t.tags,
               }}
             />
           ))}
