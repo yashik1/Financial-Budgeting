@@ -40,12 +40,28 @@ model User {
   snapTrade    SnapTradeConnection?
 }
 
-// Stubbed for the future "couples / shared" phase — unused in v1.
+// A shared household groups members who see each other's (non-private) money.
 model Household {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  members   User[]
+  id          String            @id @default(cuid())
+  name        String
+  createdById String?
+  createdAt   DateTime          @default(now())
+  members     User[]
+  invites     HouseholdInvite[]
+}
+
+// Email invitation to join a household. Accepted by the invitee when logged in.
+model HouseholdInvite {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  email       String // invitee email, lowercased
+  invitedById String
+  status      String    @default("pending") // pending | accepted | declined
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([householdId])
 }
 
 model Category {
@@ -78,6 +94,7 @@ model Account {
   balanceCents  Int      @default(0)
   currency      String   @default("USD")
   isAsset       Boolean  @default(true) // false for credit/loan (liabilities)
+  shared        Boolean  @default(true) // visible to the household? false = private
   color         String   @default("#635BFF")
   providerId    String   @default("demo") // demo | plaid | snaptrade | manual | csv
   externalId    String? // provider's account id (for real aggregation later)
@@ -141,6 +158,7 @@ model Goal {
   targetCents Int
   savedCents  Int      @default(0)
   color      String    @default("#16A374")
+  shared     Boolean   @default(true) // visible to the household? false = private
   deadline   DateTime?
   createdAt  DateTime  @default(now())
 

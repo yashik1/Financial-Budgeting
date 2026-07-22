@@ -42,6 +42,8 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
 - **Gamification** — levels & points, on-budget streaks, monthly challenges, unlockable achievements.
 - **AI Coach** *(optional)* — "ask your money anything" chat + auto-generated insights, powered by
   the Claude API (`claude-opus-4-8`). Off until you add `ANTHROPIC_API_KEY`.
+- **Couples / shared households** — invite a partner by email to share a combined view (net worth,
+  spending, per-person split, shared goals) with **per-account/goal privacy** toggles.
 - **Polish** — light/dark themes, responsive layout, PWA-installable, animated charts.
 
 ### Security & data protection
@@ -199,7 +201,7 @@ FinBud runs on Postgres and applies migrations automatically on each deploy
   background sync, webhook-driven updates, and reconnection handling
 - **P3** — AI insights & chat: **done** (`ANTHROPIC_API_KEY` → live Coach); next: AI-assisted
   categorization and spending forecasts
-- **P4** — couples / shared households with per-person views & privacy controls (schema stubbed)
+- **P4** — couples / shared households: **done** (invite, combined view, privacy toggles)
 - **P5** — native mobile: PWA today; Capacitor wrapper next (see `docs/MOBILE.md`)
 
 ---

@@ -225,3 +225,111 @@ export async function getBudgetView(userId: string, month: string = currentMonth
 export async function getGoals(userId: string) {
   return prisma.goal.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
 }
+
+/**
+ * Everything the /household page needs. Aggregates each member's SHARED
+ * accounts/transactions/goals (private ones are excluded). Spending is grouped
+ * by category *name* since members have distinct category rows sharing one
+ * taxonomy.
+ */
+export async function getHouseholdData(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+
+  const pendingInvites = await prisma.householdInvite.findMany({
+    where: { email: user.email.toLowerCase(), status: "pending" },
+    include: { household: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const myAccounts = await prisma.account.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
+  const myGoals = await prisma.goal.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
+
+  if (!user.householdId) {
+    return { inHousehold: false as const, user, invites: pendingInvites, myAccounts, myGoals };
+  }
+
+  const household = await prisma.household.findUnique({
+    where: { id: user.householdId },
+    include: {
+      members: { select: { id: true, name: true, email: true } },
+      invites: { where: { status: "pending" }, orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!household) {
+    return { inHousehold: false as const, user, invites: pendingInvites, myAccounts, myGoals };
+  }
+
+  const memberIds = household.members.map((m) => m.id);
+  const { start, end } = monthRange(currentMonthKey());
+
+  const accounts = await prisma.account.findMany({
+    where: { userId: { in: memberIds }, shared: true },
+    orderBy: [{ isAsset: "desc" }, { createdAt: "asc" }],
+  });
+  const assetsCents = accounts.filter((a) => a.isAsset).reduce((s, a) => s + a.balanceCents, 0);
+  const liabilitiesCents = accounts.filter((a) => !a.isAsset).reduce((s, a) => s + Math.abs(a.balanceCents), 0);
+  const netWorthCents = accounts.reduce((s, a) => s + a.balanceCents, 0);
+
+  const txns = await prisma.transaction.findMany({
+    where: { userId: { in: memberIds }, date: { gte: start, lte: end }, account: { shared: true } },
+    include: { category: true },
+  });
+  const asTxn = txns.map((t) => ({ amountCents: t.amountCents, categoryId: t.categoryId, isTransfer: t.isTransfer }));
+  const incomeCents = totalIncome(asTxn);
+  const spendingCents = totalSpending(asTxn);
+
+  const byName = new Map<string, { cents: number; icon: string; color: string }>();
+  for (const t of txns) {
+    if (t.isTransfer || t.amountCents >= 0) continue;
+    const name = t.category?.name ?? "Uncategorized";
+    const cur = byName.get(name) ?? { cents: 0, icon: t.category?.icon ?? "❓", color: t.category?.color ?? "#7A879C" };
+    cur.cents += -t.amountCents;
+    byName.set(name, cur);
+  }
+  const categorySpend = [...byName.entries()]
+    .map(([name, v]) => ({ id: name, name, icon: v.icon, color: v.color, cents: v.cents }))
+    .sort((a, b) => b.cents - a.cents);
+
+  const perPerson = household.members.map((m) => {
+    const mine = txns.filter((t) => t.userId === m.id && !t.isTransfer);
+    return {
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      isYou: m.id === userId,
+      spentCents: mine.filter((t) => t.amountCents < 0).reduce((s, t) => s - t.amountCents, 0),
+      incomeCents: mine.filter((t) => t.amountCents > 0).reduce((s, t) => s + t.amountCents, 0),
+    };
+  });
+
+  const goals = await prisma.goal.findMany({
+    where: { userId: { in: memberIds }, shared: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const ownerName = new Map(household.members.map((m) => [m.id, m.name]));
+  const sharedGoals = goals.map((g) => ({ ...g, ownerName: ownerName.get(g.userId) ?? "" }));
+
+  return {
+    inHousehold: true as const,
+    user,
+    household,
+    members: household.members,
+    pendingHouseholdInvites: household.invites,
+    accounts,
+    assetsCents,
+    liabilitiesCents,
+    netWorthCents,
+    incomeCents,
+    spendingCents,
+    netCents: incomeCents - spendingCents,
+    categorySpend,
+    perPerson,
+    sharedGoals,
+    myAccounts,
+    myGoals,
+  };
+}
