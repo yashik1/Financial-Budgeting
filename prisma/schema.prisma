@@ -24,6 +24,7 @@ model User {
   passwordHash String? // null for the seeded demo user (magic "Try the demo" login)
   isDemo       Boolean  @default(false)
   currency     String   @default("USD") // ISO 4217 display currency
+  country      String? // ISO 3166-1 alpha-2 default jurisdiction (for account types)
   createdAt    DateTime @default(now())
 
   householdId String?
@@ -95,7 +96,9 @@ model Account {
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
-  type          String // "checking" | "savings" | "credit" | "investment" | "cash" | "loan"
+  type          String // universal kind: checking | savings | credit | investment | cash | loan
+  subtype       String? // product/tax wrapper code (e.g. tfsa, rrsp, 401k, isa) — see lib/accountTypes
+  country       String? // ISO 3166-1 alpha-2 jurisdiction for the subtype
   institution   String
   mask          String   @default("0000") // last 4
   balanceCents  Int      @default(0)

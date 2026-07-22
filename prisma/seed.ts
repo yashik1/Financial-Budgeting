@@ -192,6 +192,14 @@ async function main() {
     },
   });
 
+  // Give the demo user a home country and tag the brokerage with a subtype so
+  // the account-type features are alive on first load.
+  await prisma.user.update({ where: { id: user.id }, data: { country: "CA" } });
+  await prisma.account.updateMany({
+    where: { userId: user.id, type: "investment" },
+    data: { subtype: "brokerage", country: "US" },
+  });
+
   const unlocked = ["first_budget", "on_budget_month", "saver_20", "investor", "goal_funded"];
   if (streak >= 3) unlocked.push("streak_3");
   if (streak >= 6) unlocked.push("streak_6");

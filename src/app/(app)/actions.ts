@@ -5,6 +5,17 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { categorize } from "@/lib/categorize";
 import { dollarsToCents, formatCents, safeCurrency } from "@/lib/money";
+import { isAssetForKind, kindForSubtype, KINDS } from "@/lib/accountTypes";
+
+const KIND_SET = new Set(KINDS.map((k) => k.kind));
+function safeKind(input: string): string {
+  return KIND_SET.has(input as (typeof KINDS)[number]["kind"]) ? input : "checking";
+}
+/** ISO-2 country code or null. */
+function safeCountry(input: string): string | null {
+  const c = input.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(c) ? c : null;
+}
 
 export async function setUserCurrency(formData: FormData) {
   const user = await requireUser();
@@ -12,6 +23,14 @@ export async function setUserCurrency(formData: FormData) {
   await prisma.user.update({ where: { id: user.id }, data: { currency } });
   // Money is shown everywhere, so refresh the whole app shell.
   revalidatePath("/", "layout");
+}
+
+export async function setUserCountry(formData: FormData) {
+  const user = await requireUser();
+  const country = safeCountry(String(formData.get("country") || ""));
+  await prisma.user.update({ where: { id: user.id }, data: { country } });
+  revalidatePath("/settings");
+  revalidatePath("/accounts");
 }
 
 async function ownTransaction(userId: string, id: string) {
@@ -34,6 +53,20 @@ export async function addSubcategory(formData: FormData) {
   });
   revalidatePath("/budgets");
   revalidatePath("/transactions");
+}
+
+/** Delete a subcategory: its transactions become uncategorized; limits/rules go. */
+export async function deleteSubcategory(categoryId: string) {
+  const user = await requireUser();
+  const cat = await prisma.category.findFirst({ where: { id: categoryId, userId: user.id } });
+  if (!cat || !cat.parentId) return; // only real subcategories, never top-level
+  await prisma.transaction.updateMany({ where: { userId: user.id, categoryId }, data: { categoryId: null } });
+  await prisma.budgetLine.deleteMany({ where: { userId: user.id, categoryId } });
+  await prisma.rule.deleteMany({ where: { userId: user.id, categoryId } });
+  await prisma.category.delete({ where: { id: categoryId } });
+  revalidatePath("/budgets");
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
 }
 
 export async function updateTransaction(formData: FormData) {
@@ -267,22 +300,68 @@ export async function importTransactions(accountId: string, rows: ImportRowInput
   return { imported: data.length };
 }
 
+// Read the country/kind/subtype trio from a form, keeping kind and subtype
+// consistent (a subtype forces its own kind).
+function readAccountType(formData: FormData): { type: string; subtype: string | null; country: string | null } {
+  const country = safeCountry(String(formData.get("country") || ""));
+  const subRaw = String(formData.get("subtype") || "").trim();
+  const subtype = subRaw || null;
+  const kindFromSub = subtype ? kindForSubtype(subtype) : undefined;
+  const type = kindFromSub ?? safeKind(String(formData.get("type") || "checking"));
+  return { type, subtype, country };
+}
+
 export async function addManualAccount(formData: FormData) {
   const user = await requireUser();
   const name = String(formData.get("name") || "").trim();
-  const type = String(formData.get("type") || "checking");
-  const institution = String(formData.get("institution") || "Manual").trim() || "Manual";
-  const isLiability = type === "credit" || type === "loan";
-  const magnitude = Math.abs(dollarsToCents(String(formData.get("balance") || "0")));
-  const balanceCents = isLiability ? -magnitude : magnitude;
   if (!name) return;
+  const institution = String(formData.get("institution") || "Manual").trim() || "Manual";
+  const { type, subtype, country } = readAccountType(formData);
+  const asset = isAssetForKind(type);
+  const magnitude = Math.abs(dollarsToCents(String(formData.get("balance") || "0")));
+  const balanceCents = asset ? magnitude : -magnitude;
+  const currency = safeCurrency(String(formData.get("currency") || user.currency));
   await prisma.account.create({
     data: {
-      userId: user.id, name, type, institution, mask: "0000",
-      balanceCents, isAsset: !isLiability, providerId: "manual",
-      color: isLiability ? "#E14C60" : "#635BFF",
+      userId: user.id, name, type, subtype, country: country ?? user.country ?? null,
+      institution, mask: "0000", balanceCents, currency, isAsset: asset, providerId: "manual",
+      color: asset ? "#635BFF" : "#E14C60",
     },
   });
   revalidatePath("/accounts");
   revalidatePath("/dashboard");
+}
+
+export async function updateAccount(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") || "");
+  const acct = await prisma.account.findFirst({ where: { id, userId: user.id } });
+  if (!acct) return;
+  const name = String(formData.get("name") || "").trim() || acct.name;
+  const institution = String(formData.get("institution") || "").trim() || acct.institution;
+  const { type, subtype, country } = readAccountType(formData);
+  const asset = isAssetForKind(type);
+  const magnitude = Math.abs(dollarsToCents(String(formData.get("balance") || "0")));
+  const balanceCents = asset ? magnitude : -magnitude;
+  const currency = safeCurrency(String(formData.get("currency") || acct.currency));
+  const shared = formData.get("shared") != null;
+  await prisma.account.update({
+    where: { id },
+    data: {
+      name, institution, type, subtype, country, balanceCents, currency, isAsset: asset, shared,
+      color: asset ? (acct.isAsset ? acct.color : "#635BFF") : "#E14C60",
+    },
+  });
+  revalidatePath("/accounts");
+  revalidatePath("/dashboard");
+  revalidatePath("/household");
+}
+
+export async function deleteAccount(accountId: string) {
+  const user = await requireUser();
+  // Cascade removes the account's transactions (see schema onDelete: Cascade).
+  await prisma.account.deleteMany({ where: { id: accountId, userId: user.id } });
+  revalidatePath("/accounts");
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
 }

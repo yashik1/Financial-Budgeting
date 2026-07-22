@@ -5,6 +5,7 @@ import { formatCents, safeCurrency } from "@/lib/money";
 import { monthLabel, safeMonthKey } from "@/lib/dates";
 import { BudgetLimitForm } from "@/components/app/BudgetLimitForm";
 import { AddSubcategory } from "@/components/app/AddSubcategory";
+import { DeleteSubcategoryButton } from "@/components/app/DeleteSubcategoryButton";
 import { MonthSwitcher } from "@/components/app/MonthSwitcher";
 import { CategorySelect, type CatOption } from "@/components/app/CategorySelect";
 import { cn } from "@/lib/cn";
@@ -45,6 +46,7 @@ function Row({
         </div>
       </div>
       <BudgetLimitForm categoryId={row.categoryId} month={month} limitCents={row.limitCents} currency={currency} />
+      {child && <DeleteSubcategoryButton categoryId={row.categoryId} name={row.name} />}
     </div>
   );
 }

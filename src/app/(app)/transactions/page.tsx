@@ -3,18 +3,10 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getTransactions, getUsedTags, type TxnFilters } from "@/lib/queries";
 import { safeCurrency } from "@/lib/money";
+import { kindLabel } from "@/lib/accountTypes";
 import { TransactionItem } from "@/components/app/TransactionItem";
 import type { CatOption } from "@/components/app/CategorySelect";
 import { Upload, Search, X, Tag } from "lucide-react";
-
-const TYPE_LABEL: Record<string, string> = {
-  checking: "Checking",
-  savings: "Savings",
-  credit: "Credit card",
-  investment: "Investment",
-  cash: "Cash",
-  loan: "Loan",
-};
 
 type SP = {
   category?: string;
@@ -131,7 +123,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <select id="atype" name="atype" defaultValue={sp.atype ?? ""} className="input">
             <option value="">All</option>
             {accountTypes.map((t) => (
-              <option key={t} value={t}>{TYPE_LABEL[t] ?? t}</option>
+              <option key={t} value={t}>{kindLabel(t)}</option>
             ))}
           </select>
         </div>

@@ -2,22 +2,16 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getAccountsOverview } from "@/lib/queries";
-import { formatCents, safeCurrency, currencySymbol } from "@/lib/money";
+import { formatCents, safeCurrency } from "@/lib/money";
+import { accountTypeLabel } from "@/lib/accountTypes";
 import { addManualAccount, addDemoAccounts } from "@/app/(app)/actions";
 import { isPlaidEnabled } from "@/lib/aggregation/plaid";
 import { isSnapTradeEnabled } from "@/lib/aggregation/snaptrade";
 import { ConnectPanel } from "@/components/app/ConnectPanel";
+import { AccountEditor } from "@/components/app/AccountEditor";
+import { AccountTypeSelect } from "@/components/app/AccountTypeSelect";
 import { cn } from "@/lib/cn";
 import { Upload, Sparkles, PlusCircle } from "lucide-react";
-
-const TYPE_LABEL: Record<string, string> = {
-  checking: "Checking",
-  savings: "Savings",
-  credit: "Credit card",
-  investment: "Investment",
-  cash: "Cash",
-  loan: "Loan",
-};
 
 export default async function AccountsPage() {
   const user = await requireUser();
@@ -73,15 +67,31 @@ export default async function AccountsPage() {
             </div>
             <div className="divide-y divide-border">
               {list.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+                <div key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="h-8 w-1.5 rounded-full" style={{ background: a.color }} />
-                  <div>
+                  <div className="min-w-0">
                     <div className="font-medium">{a.name}</div>
-                    <div className="text-xs text-muted">{TYPE_LABEL[a.type] ?? a.type} ···· {a.mask}</div>
+                    <div className="text-xs text-muted">
+                      {accountTypeLabel(a)} ···· {a.mask}
+                      {a.country ? ` · ${a.country}` : ""}
+                    </div>
                   </div>
                   <div className={cn("ml-auto text-right font-semibold tabular", a.balanceCents < 0 ? "text-negative" : "text-fg")}>
                     {formatCents(a.balanceCents, { currency })}
                   </div>
+                  <AccountEditor
+                    account={{
+                      id: a.id,
+                      name: a.name,
+                      institution: a.institution,
+                      type: a.type,
+                      subtype: a.subtype,
+                      country: a.country,
+                      balanceCents: a.balanceCents,
+                      currency: a.currency,
+                      shared: a.shared,
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -121,25 +131,15 @@ export default async function AccountsPage() {
               <label className="label" htmlFor="name">Account name</label>
               <input id="name" name="name" className="input" placeholder="Everyday Checking" required />
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="label" htmlFor="institution">Institution</label>
               <input id="institution" name="institution" className="input" placeholder="Chase" />
             </div>
-            <div>
-              <label className="label" htmlFor="type">Type</label>
-              <select id="type" name="type" className="input">
-                <option value="checking">Checking</option>
-                <option value="savings">Savings</option>
-                <option value="credit">Credit card</option>
-                <option value="investment">Investment</option>
-                <option value="cash">Cash</option>
-                <option value="loan">Loan</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="label" htmlFor="balance">Current balance ({currencySymbol(currency)})</label>
-              <input id="balance" name="balance" inputMode="decimal" className="input" placeholder="1000" />
-            </div>
+          </div>
+          <AccountTypeSelect idPrefix="add" country={user.country} type="checking" subtype={null} />
+          <div>
+            <label className="label" htmlFor="balance">Current balance</label>
+            <input id="balance" name="balance" inputMode="decimal" className="input" placeholder="1000" />
           </div>
           <button className="btn-primary w-full">Add account</button>
         </form>
