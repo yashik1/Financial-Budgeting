@@ -6,9 +6,10 @@ envelope/zero-based budgeting, cash-flow and net-worth tracking with a game-like
 streaks, monthly challenges, achievements, and **Fitch**, a mascot who reacts to how your
 month is going.
 
-> **Status:** Phase 1 MVP. Runs entirely on demo data + CSV import — **no paid API keys
-> or bank logins required**. Real bank/broker connectivity (Plaid, SnapTrade) plugs into
-> the same interface later; see [Connectivity](#connectivity).
+> **Status:** Phase 1 MVP + **sandbox-ready connectivity**. Runs entirely on demo data + CSV
+> import out of the box — **no keys required**. Real bank (Plaid) and broker (SnapTrade)
+> connectivity is fully wired behind the same interface and turns on the moment you drop in
+> **free sandbox keys**; see [Connectivity](#connectivity).
 
 ---
 
@@ -88,9 +89,12 @@ src/
       actions.ts           # server actions (recategorize, budgets, goals, import, accounts)
   lib/
     aggregation/           # ← the connectivity seam
-      provider.ts          #   AggregationProvider interface (banks/brokers implement this)
+      provider.ts          #   AggregationProvider interface (all sources implement this)
       demo.ts              #   DemoProvider — generates lifelike accounts + transactions
       csv.ts               #   CSV/OFX parser + column mapping
+      plaid.ts             #   Plaid: link token, token exchange, transactionsSync mapping
+      snaptrade.ts         #   SnapTrade: user registration, portal URL, activity mapping
+      sync.ts              #   normalize → DB upsert (idempotent, auto-categorized)
     budget.ts              # cash-flow + envelope math (pure, tested)
     categorize.ts          # deterministic merchant→category matching (pure, tested)
     gamification.ts        # levels, mascot, streaks, challenges (pure, tested)
@@ -111,15 +115,43 @@ strings — so the schema ports cleanly between SQLite and Postgres.
 ## Connectivity
 
 No budgeting app talks to banks directly — they resell aggregation APIs. FinBud isolates
-that behind one interface (`src/lib/aggregation/provider.ts`):
+that behind one interface (`src/lib/aggregation/provider.ts`). All sources — demo, CSV,
+manual, **Plaid**, and **SnapTrade** — implement the same shape, so nothing else in the app
+changes when you switch:
 
-- **Today:** `DemoProvider` + **CSV/OFX import** + manual entry (zero cost, fully usable).
-- **Next (drop-in):** **Plaid** (banks, cards, transactions) and **SnapTrade** (brokerages,
-  crypto) implement the *same* `AggregationProvider` interface. Adding them is API keys +
-  an OAuth link flow — **not a rewrite**. Env slots already exist in `.env.example`.
+- **Always on:** `DemoProvider` + **CSV/OFX import** + manual entry (zero cost).
+- **Wired & sandbox-ready:** **Plaid** (banks/cards/transactions) and **SnapTrade**
+  (brokerages/crypto). Fully implemented — Plaid Link + public-token exchange + incremental
+  `transactionsSync`; SnapTrade user registration + hosted connection portal + activity sync.
+  They stay dormant until keys are present, then appear as **Connect** buttons on the
+  Accounts page. Data is normalized and auto-categorized through the same pipeline as demo/CSV.
 
-> Production access to Plaid/SnapTrade requires a paid business account and compliance
-> verification, which is why v1 ships on demo + CSV.
+### Activate the sandboxes (free, ~5 minutes)
+
+**Plaid (banks):**
+1. Sign up free at <https://dashboard.plaid.com/signup> → **Team Settings → Keys**.
+2. Copy your `client_id` and the **Sandbox** secret into `.env`:
+   ```
+   PLAID_CLIENT_ID=...
+   PLAID_SECRET=...
+   PLAID_ENV=sandbox
+   ```
+3. Restart, open **Accounts → Connect a bank**, and in Plaid Link use sandbox creds
+   `user_good` / `pass_good`.
+
+**SnapTrade (brokers):**
+1. Request free sandbox access at <https://snaptrade.com> (Dashboard → API keys).
+2. Add to `.env`:
+   ```
+   SNAPTRADE_CLIENT_ID=...
+   SNAPTRADE_CONSUMER_KEY=...
+   ```
+3. Restart, open **Accounts → Connect a broker**, complete the portal, then **Sync**.
+
+> **Production** (real, live accounts) additionally requires a paid business plan and
+> compliance verification with each provider — that's the only thing sandbox keys don't unlock.
+> Access tokens/secrets are stored plaintext for sandbox convenience; **encrypt them at rest
+> before going to production.**
 
 ---
 
@@ -136,7 +168,8 @@ npm run setup
 
 ## Roadmap
 
-- **P2** — Plaid + SnapTrade (sandbox → production), sync scheduler, reconnection handling
+- **P2** — Plaid + SnapTrade **sandbox is done**; next: production access, a scheduled
+  background sync, webhook-driven updates, and reconnection handling
 - **P3** — AI insights & chat ("ask your money anything"), smarter categorization, forecasts
 - **P4** — couples / shared households with per-person views & privacy controls
 - **P5** — native mobile client reusing the backend & domain logic

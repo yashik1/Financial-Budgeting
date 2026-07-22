@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
 import { getAccountsOverview } from "@/lib/queries";
 import { formatCents } from "@/lib/money";
 import { addManualAccount, addDemoAccounts } from "@/app/(app)/actions";
+import { isPlaidEnabled } from "@/lib/aggregation/plaid";
+import { isSnapTradeEnabled } from "@/lib/aggregation/snaptrade";
+import { ConnectPanel } from "@/components/app/ConnectPanel";
 import { cn } from "@/lib/cn";
 import { Upload, Sparkles, PlusCircle } from "lucide-react";
 
@@ -18,6 +22,10 @@ const TYPE_LABEL: Record<string, string> = {
 export default async function AccountsPage() {
   const user = await requireUser();
   const { accounts, assetsCents, liabilitiesCents, netWorthCents } = await getAccountsOverview(user.id);
+  const [plaidCount, snapConn] = await Promise.all([
+    prisma.plaidItem.count({ where: { userId: user.id } }),
+    prisma.snapTradeConnection.findUnique({ where: { userId: user.id } }),
+  ]);
 
   const byInstitution = new Map<string, typeof accounts>();
   for (const a of accounts) {
@@ -88,7 +96,22 @@ export default async function AccountsPage() {
         )}
       </div>
 
-      {/* Add account */}
+      {/* Connect real institutions (sandbox-ready) */}
+      <div>
+        <h2 className="mb-1 text-lg font-bold">Connect your institutions</h2>
+        <p className="mb-3 text-sm text-muted">
+          Same provider interface, real data. Sandbox works with free keys — see the README.
+          {!isPlaidEnabled() && !isSnapTradeEnabled() && " Add keys to .env to turn these on."}
+        </p>
+        <ConnectPanel
+          plaidEnabled={isPlaidEnabled()}
+          snapEnabled={isSnapTradeEnabled()}
+          hasPlaidItems={plaidCount > 0}
+          hasSnapConn={!!snapConn}
+        />
+      </div>
+
+      {/* Add account manually / demo */}
       <div className="grid gap-4 lg:grid-cols-2">
         <form action={addManualAccount} className="card space-y-3 p-5">
           <div className="flex items-center gap-2 font-bold"><PlusCircle className="h-4 w-4 text-brand" /> Add an account manually</div>
@@ -121,16 +144,17 @@ export default async function AccountsPage() {
         </form>
 
         <div className="card space-y-3 p-5">
-          <div className="font-bold">Connect the real thing (coming soon)</div>
+          <div className="font-bold">One interface, every source</div>
           <p className="text-sm text-muted">
-            FinBud is built around a single provider interface. Today it runs on demo data and CSV import.
-            Plaid (banks & cards) and SnapTrade (brokerages & crypto) plug into the same seam — no rewrite,
-            just API keys.
+            Demo, CSV, manual, Plaid, and SnapTrade all implement the same
+            <code className="mx-1 rounded bg-surface-2 px-1">AggregationProvider</code>
+            seam — so nothing about the app changes when you switch sources.
           </p>
           <div className="flex flex-wrap gap-2">
             <span className="chip bg-surface-2 text-muted">🏦 Plaid — banks</span>
             <span className="chip bg-surface-2 text-muted">📈 SnapTrade — brokers</span>
-            <span className="chip bg-surface-2 text-muted">📄 CSV / OFX — today</span>
+            <span className="chip bg-surface-2 text-muted">📄 CSV / OFX</span>
+            <span className="chip bg-surface-2 text-muted">✍️ Manual</span>
           </div>
           <form action={addDemoAccounts}>
             <button className="btn-ghost w-full"><Sparkles className="h-4 w-4" /> Add sample demo accounts</button>

@@ -33,6 +33,8 @@ model User {
   rules        Rule[]
   achievements Achievement[]
   stats        UserStats?
+  plaidItems   PlaidItem[]
+  snapTrade    SnapTradeConnection?
 }
 
 // Stubbed for the future "couples / shared" phase — unused in v1.
@@ -103,11 +105,14 @@ model Transaction {
   splitParentId  String?
   splitParent    Transaction?  @relation("Splits", fields: [splitParentId], references: [id])
   splits         Transaction[] @relation("Splits")
+  // Provider transaction id, used to de-duplicate incremental syncs.
+  externalId     String?
   createdAt      DateTime @default(now())
 
   @@index([userId, date])
   @@index([accountId])
   @@index([categoryId])
+  @@index([externalId])
 }
 
 // Envelope / zero-based budgeting: one limit per category per month.
@@ -173,4 +178,34 @@ model UserStats {
   level          Int    @default(1)
   savingsStreak  Int    @default(0) // consecutive on-budget months
   longestStreak  Int    @default(0)
+}
+
+// ---------------------------------------------------------------------------
+// Real bank/broker connectivity (sandbox-ready). Populated only when provider
+// keys are configured; the app runs on demo + CSV without these.
+// ---------------------------------------------------------------------------
+
+// One Plaid "Item" = one connected bank login (may hold several accounts).
+model PlaidItem {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId      String   @unique
+  // NOTE: store encrypted at rest in production. Plaintext here for sandbox.
+  accessToken String
+  institution String   @default("Bank")
+  cursor      String? // transactionsSync cursor for incremental pulls
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+// SnapTrade registers a user and returns a userSecret used on every call.
+model SnapTradeConnection {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapUserId String
+  userSecret String // treat as a credential — encrypt at rest in production
+  createdAt  DateTime @default(now())
 }
