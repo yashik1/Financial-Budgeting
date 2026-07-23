@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { formatCents } from "@/lib/money";
 import { shortMonthLabel } from "@/lib/dates";
+import { useThemeColors } from "./useThemeColors";
 
 type Point = { month: string; cents: number };
 
@@ -25,6 +26,7 @@ function ChartTooltip({ active, payload, currency }: any) {
 }
 
 export function NetWorthChart({ data, currency }: { data: Point[]; currency?: string }) {
+  const { brand } = useThemeColors();
   const first = data[0];
   const last = data[data.length - 1];
   const summary =
@@ -37,8 +39,8 @@ export function NetWorthChart({ data, currency }: { data: Point[]; currency?: st
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
           <defs>
             <linearGradient id="nw" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#7B74FF" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#7B74FF" stopOpacity={0} />
+              <stop offset="0%" stopColor={brand} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={brand} stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis
@@ -50,11 +52,11 @@ export function NetWorthChart({ data, currency }: { data: Point[]; currency?: st
             dy={6}
           />
           <YAxis hide domain={["dataMin - 100000", "dataMax + 100000"]} />
-          <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ stroke: "#7B74FF", strokeDasharray: 4 }} />
+          <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ stroke: brand, strokeDasharray: 4 }} />
           <Area
             type="monotone"
             dataKey="cents"
-            stroke="#7B74FF"
+            stroke={brand}
             strokeWidth={2}
             fill="url(#nw)"
             dot={false}

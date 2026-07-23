@@ -3,23 +3,21 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatCents } from "@/lib/money";
 import { shortMonthLabel } from "@/lib/dates";
+import { useThemeColors } from "./useThemeColors";
 
 type Row = { month: string; incomeCents: number; spendingCents: number };
 
-const INCOME = "#16A374";
-const SPEND = "#E14C60";
-
-function ChartTooltip({ active, payload, label, currency }: any) {
+function ChartTooltip({ active, payload, label, currency, income, spend }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-border bg-surface px-3 py-2 shadow-card">
       <div className="mb-1 text-xs text-muted">{shortMonthLabel(label)}</div>
       <div className="flex items-center gap-2 text-sm">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: INCOME }} />
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: income }} />
         Income <span className="ml-auto font-semibold tabular">{formatCents(payload[0]?.value ?? 0, { currency })}</span>
       </div>
       <div className="flex items-center gap-2 text-sm">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: SPEND }} />
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: spend }} />
         Spending <span className="ml-auto font-semibold tabular">{formatCents(payload[1]?.value ?? 0, { currency })}</span>
       </div>
     </div>
@@ -27,6 +25,7 @@ function ChartTooltip({ active, payload, label, currency }: any) {
 }
 
 export function CashflowChart({ data, currency }: { data: Row[]; currency?: string }) {
+  const { positive: INCOME, negative: SPEND } = useThemeColors();
   const last = data[data.length - 1];
   const summary = last
     ? `Monthly income versus spending, ${data.length} months. Latest (${shortMonthLabel(last.month)}): income ${formatCents(last.incomeCents, { currency })}, spending ${formatCents(last.spendingCents, { currency })}.`
@@ -53,7 +52,7 @@ export function CashflowChart({ data, currency }: { data: Row[]; currency?: stri
               dy={6}
             />
             <YAxis hide />
-            <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ fill: "rgba(128,128,140,0.08)" }} />
+            <Tooltip content={<ChartTooltip currency={currency} income={INCOME} spend={SPEND} />} cursor={{ fill: "rgba(128,128,140,0.08)" }} />
             <Bar dataKey="incomeCents" fill={INCOME} radius={[4, 4, 0, 0]} maxBarSize={22} />
             <Bar dataKey="spendingCents" fill={SPEND} radius={[4, 4, 0, 0]} maxBarSize={22} />
           </BarChart>
