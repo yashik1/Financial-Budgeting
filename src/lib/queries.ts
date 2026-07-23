@@ -405,8 +405,27 @@ export async function getBudgetView(userId: string, month: string = currentMonth
   return { month, groups, summary: overview.summary, incomeCents: overview.incomeCents };
 }
 
-export async function getGoals(userId: string) {
-  return prisma.goal.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
+export type GoalView = Awaited<ReturnType<typeof prisma.goal.findMany>>[number] & {
+  fundedCents: number;
+  accountName: string | null;
+};
+
+/**
+ * Goals with their effective funded amount. When a goal is linked to an
+ * account, progress tracks that account's (asset) balance; otherwise it falls
+ * back to any manually-stored amount.
+ */
+export async function getGoals(userId: string): Promise<GoalView[]> {
+  const goals = await prisma.goal.findMany({
+    where: { userId },
+    include: { account: { select: { name: true, balanceCents: true, isAsset: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return goals.map(({ account, ...g }) => ({
+    ...g,
+    fundedCents: account ? Math.max(0, account.balanceCents) : g.savedCents,
+    accountName: account?.name ?? null,
+  }));
 }
 
 /**

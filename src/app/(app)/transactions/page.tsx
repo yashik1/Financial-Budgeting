@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { getTransactions, getUsedTags, type TxnFilters } from "@/lib/queries";
 import { safeCurrency } from "@/lib/money";
 import { kindLabel } from "@/lib/accountTypes";
-import { TransactionItem } from "@/components/app/TransactionItem";
+import { TransactionList } from "@/components/app/TransactionList";
+import type { TxnItem } from "@/components/app/TransactionItem";
 import type { CatOption } from "@/components/app/CategorySelect";
 import { Upload, Search, X, Tag } from "lucide-react";
 
@@ -58,12 +59,26 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const tagNames = usedTags.map((t) => t.tag);
   const activeFilters = Object.values(sp).filter(Boolean).length;
 
+  const txnItems: TxnItem[] = txns.map((t) => ({
+    id: t.id,
+    merchant: t.merchant,
+    dateISO: new Date(t.date).toISOString(),
+    amountCents: t.amountCents,
+    categoryId: t.categoryId,
+    categoryIcon: t.category?.icon ?? "❓",
+    categoryColor: t.category?.color ?? "#7A879C",
+    accountName: t.account.name,
+    isTransfer: t.isTransfer,
+    notes: t.notes,
+    tags: t.tags,
+  }));
+
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Transactions</h1>
-          <p className="text-sm text-muted">{txns.length} shown · tap a category to recategorize, ✏️ to edit</p>
+          <p className="text-sm text-muted">Filter, edit, tag — or <strong>Select</strong> to edit many at once</p>
         </div>
         <Link href="/accounts/import" className="btn-primary">
           <Upload className="h-4 w-4" /> Import CSV
@@ -168,35 +183,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      {/* List */}
-      <div className="card overflow-hidden">
-        <div className="divide-y divide-border">
-          {txns.map((t) => (
-            <TransactionItem
-              key={t.id}
-              categories={catOptions}
-              currency={currency}
-              knownTags={tagNames}
-              txn={{
-                id: t.id,
-                merchant: t.merchant,
-                dateISO: new Date(t.date).toISOString(),
-                amountCents: t.amountCents,
-                categoryId: t.categoryId,
-                categoryIcon: t.category?.icon ?? "❓",
-                categoryColor: t.category?.color ?? "#7A879C",
-                accountName: t.account.name,
-                isTransfer: t.isTransfer,
-                notes: t.notes,
-                tags: t.tags,
-              }}
-            />
-          ))}
-          {txns.length === 0 && (
-            <p className="px-4 py-12 text-center text-sm text-muted">No transactions match your filters.</p>
-          )}
-        </div>
-      </div>
+      {/* List + bulk edit */}
+      <TransactionList txns={txnItems} categories={catOptions} currency={currency} knownTags={tagNames} />
     </div>
   );
 }

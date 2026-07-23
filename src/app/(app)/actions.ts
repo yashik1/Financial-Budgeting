@@ -110,6 +110,49 @@ export async function recategorizeTransaction(txnId: string, categoryId: string)
   revalidatePath("/dashboard");
 }
 
+// --- Bulk transaction edits (from the Transactions multi-select) ---
+
+export async function bulkCategorize(ids: string[], categoryId: string) {
+  const user = await requireUser();
+  if (!ids.length) return;
+  await prisma.transaction.updateMany({
+    where: { id: { in: ids }, userId: user.id },
+    data: { categoryId: categoryId || null },
+  });
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
+export async function bulkAddTag(ids: string[], rawTag: string) {
+  const user = await requireUser();
+  const tag = rawTag.trim().toLowerCase();
+  if (!ids.length || !tag) return;
+  // Scalar-array push per row so we can skip rows that already have the tag.
+  const rows = await prisma.transaction.findMany({
+    where: { id: { in: ids }, userId: user.id },
+    select: { id: true, tags: true },
+  });
+  await Promise.all(
+    rows
+      .filter((r) => !r.tags.includes(tag))
+      .map((r) =>
+        prisma.transaction.update({
+          where: { id: r.id },
+          data: { tags: { set: [...r.tags, tag].slice(0, 12) } },
+        }),
+      ),
+  );
+  revalidatePath("/transactions");
+}
+
+export async function bulkDeleteTransactions(ids: string[]) {
+  const user = await requireUser();
+  if (!ids.length) return;
+  await prisma.transaction.deleteMany({ where: { id: { in: ids }, userId: user.id } });
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
 export type BudgetLimitResult = { ok: boolean; error?: string };
 
 export async function setBudgetLimit(
@@ -178,26 +221,53 @@ export async function setBudgetLimit(
   return { ok: true };
 }
 
+// Validate that an account belongs to the user (or clear the link).
+async function ownAccountId(userId: string, raw: string): Promise<string | null> {
+  const id = raw.trim();
+  if (!id) return null;
+  const acct = await prisma.account.findFirst({ where: { id, userId }, select: { id: true } });
+  return acct ? acct.id : null;
+}
+
 export async function createGoal(formData: FormData) {
   const user = await requireUser();
   const name = String(formData.get("name") || "").trim();
   const emoji = String(formData.get("emoji") || "🎯").trim() || "🎯";
   const target = dollarsToCents(String(formData.get("target") || "0"));
   if (!name || target <= 0) return;
+  const accountId = await ownAccountId(user.id, String(formData.get("accountId") || ""));
+  const deadlineStr = String(formData.get("deadline") || "");
   await prisma.goal.create({
-    data: { userId: user.id, name, emoji, targetCents: target, savedCents: 0, color: "#635BFF" },
+    data: {
+      userId: user.id,
+      name,
+      emoji,
+      targetCents: target,
+      savedCents: 0,
+      color: "#635BFF",
+      accountId,
+      deadline: deadlineStr ? new Date(deadlineStr) : null,
+    },
   });
   revalidatePath("/goals");
   revalidatePath("/dashboard");
 }
 
-export async function fundGoal(goalId: string, dollars: string) {
+export async function updateGoal(formData: FormData) {
   const user = await requireUser();
-  const goal = await prisma.goal.findFirst({ where: { id: goalId, userId: user.id } });
+  const id = String(formData.get("id") || "");
+  const goal = await prisma.goal.findFirst({ where: { id, userId: user.id } });
   if (!goal) return;
-  const add = dollarsToCents(dollars);
-  const saved = Math.max(0, goal.savedCents + add);
-  await prisma.goal.update({ where: { id: goalId }, data: { savedCents: saved } });
+  const name = String(formData.get("name") || "").trim() || goal.name;
+  const emoji = String(formData.get("emoji") || "").trim() || goal.emoji;
+  const targetStr = String(formData.get("target") || "");
+  const targetCents = targetStr ? Math.max(1, dollarsToCents(targetStr)) : goal.targetCents;
+  const accountId = await ownAccountId(user.id, String(formData.get("accountId") || ""));
+  const deadlineStr = String(formData.get("deadline") || "");
+  await prisma.goal.update({
+    where: { id },
+    data: { name, emoji, targetCents, accountId, deadline: deadlineStr ? new Date(deadlineStr) : null },
+  });
   revalidatePath("/goals");
   revalidatePath("/dashboard");
 }

@@ -155,7 +155,7 @@ export default async function DashboardPage({
             />
             <ul className="space-y-3">
               {goals.slice(0, 3).map((g) => {
-                const pct = Math.min(100, Math.round((g.savedCents / g.targetCents) * 100));
+                const pct = Math.min(100, Math.round((g.fundedCents / g.targetCents) * 100));
                 return (
                   <li key={g.id}>
                     <div className="mb-1 flex items-center gap-2 text-sm">

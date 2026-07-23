@@ -167,6 +167,13 @@ async function main() {
     ],
   });
 
+  // Link the Emergency Fund to the savings account so its progress tracks a
+  // real balance (the new account-linked goals model).
+  const savings = await prisma.account.findFirst({ where: { userId: user.id, type: "savings" } });
+  if (savings) {
+    await prisma.goal.updateMany({ where: { userId: user.id, name: "Emergency Fund" }, data: { accountId: savings.id } });
+  }
+
   // Gamification: compute the on-budget streak from generated cash flow.
   const byMonth = new Map<string, { incomeCents: number; spendingCents: number }>();
   for (const t of transactions) {

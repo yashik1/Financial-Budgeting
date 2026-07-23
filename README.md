@@ -42,7 +42,7 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
 - **Budgets** — envelope budgeting with **categories & collapsible subcategories** (e.g. Transportation → Gas, Oil Change, Tires — click a category to expand), inline-editable limits, parent roll-ups, and live progress. Subcategory limits **can't exceed their parent** (you get a clear error), and an **Uncategorized** section surfaces spending that isn't in any budget so you can sort it.
 - **Currency** — pick any of the world's currencies in Settings; amounts re-format everywhere with the right symbol and decimal rules (e.g. ¥ has none). Display-only — no FX conversion.
 - **Accounts** — grouped by institution; **edit any account inline** (name, institution, type, balance, currency, sharing) or delete it. Types are **global**: a universal *kind* plus country-specific *products* — Canada's RRSP/TFSA/FHSA, US 401(k)/IRA/HSA, UK ISA/SIPP, AU Super — driven by a code catalog (`src/lib/accountTypes.ts`) and your **home country** (Settings), with any country selectable per account.
-- **Goals** — create, fund, and track savings goals.
+- **Goals** — create and **edit** savings goals (name, target, date, icon) and **link each to a funding account** so progress tracks that account's balance automatically — no manual top-ups.
 - **Accounts** — grouped by institution; add manually, load demo accounts, or **import CSV/OFV**.
 - **CSV import** — upload a bank/brokerage export, map columns (single-amount or debit/credit),
   preview, and import with automatic categorization.

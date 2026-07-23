@@ -111,6 +111,7 @@ model Account {
   createdAt     DateTime @default(now())
 
   transactions Transaction[]
+  goals        Goal[]
 
   @@index([userId])
 }
@@ -171,9 +172,13 @@ model Goal {
   color      String    @default("#16A374")
   shared     Boolean   @default(true) // visible to the household? false = private
   deadline   DateTime?
+  // Optional funding account: progress tracks this account's balance.
+  accountId  String?
+  account    Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt  DateTime  @default(now())
 
   @@index([userId])
+  @@index([accountId])
 }
 
 // Auto-categorization rule: if `matcher` appears in the description, apply category.

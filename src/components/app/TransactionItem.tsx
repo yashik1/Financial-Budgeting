@@ -25,11 +25,15 @@ export function TransactionItem({
   categories,
   currency,
   knownTags = [],
+  selected,
+  onToggleSelect,
 }: {
   txn: TxnItem;
   categories: CatOption[];
   currency?: string;
   knownTags?: string[];
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
@@ -48,8 +52,17 @@ export function TransactionItem({
   };
 
   return (
-    <div className="px-4 py-3 hover:bg-surface-2/40">
+    <div className={`px-4 py-3 hover:bg-surface-2/40 ${selected ? "bg-brand-soft/50" : ""}`}>
       <div className="flex flex-wrap items-center gap-3">
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onToggleSelect}
+            aria-label={`Select ${txn.merchant}`}
+            className="h-4 w-4 shrink-0 rounded border-border accent-brand"
+          />
+        )}
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: `${txn.categoryColor}1f` }}>
           {txn.categoryIcon}
         </div>
