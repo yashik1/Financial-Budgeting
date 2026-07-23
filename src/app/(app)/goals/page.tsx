@@ -76,8 +76,20 @@ export default async function GoalsPage() {
                   <span className="font-semibold tabular">{formatCents(g.savedCents, { currency })}</span>
                   <span className="text-muted tabular">of {formatCents(g.targetCents, { currency })}</span>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="goal-bar h-2.5 overflow-hidden rounded-full bg-surface-2">
                   <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: g.color }} />
+                </div>
+                {/* Almanac theme: a filling jar instead of a bar (CSS-toggled). */}
+                <div className="goal-jar mt-1">
+                  <svg width="80" height="98" viewBox="0 0 88 108" role="img" aria-label={`${g.name} jar, ${pct}% full`}>
+                    <rect x="30" y="4" width="28" height="9" rx="3" fill="rgb(var(--muted))" />
+                    <clipPath id={`jar-${g.id}`}>
+                      <path d="M20 20 h48 a6 6 0 0 1 6 6 v66 a10 10 0 0 1 -10 10 h-40 a10 10 0 0 1 -10 -10 v-66 a6 6 0 0 1 6 -6 Z" />
+                    </clipPath>
+                    <path d="M20 20 h48 a6 6 0 0 1 6 6 v66 a10 10 0 0 1 -10 10 h-40 a10 10 0 0 1 -10 -10 v-66 a6 6 0 0 1 6 -6 Z" fill="rgb(var(--surface-2))" stroke="rgb(var(--fg))" strokeWidth="2" />
+                    <rect clipPath={`url(#jar-${g.id})`} x="18" y={20 + 78 * (1 - pct / 100)} width="52" height={78 * (pct / 100)} fill={g.color} opacity="0.85" />
+                    <path d="M20 20 h48 a6 6 0 0 1 6 6 v66 a10 10 0 0 1 -10 10 h-40 a10 10 0 0 1 -10 -10 v-66 a6 6 0 0 1 6 -6 Z" fill="none" stroke="rgb(var(--fg))" strokeWidth="2" />
+                  </svg>
                 </div>
               </div>
 

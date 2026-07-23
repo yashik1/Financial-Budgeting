@@ -27,7 +27,7 @@ export const viewport: Viewport = {
 };
 
 // Apply the saved/system theme + skin before first paint to avoid a flash.
-const themeScript = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('finbud-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){d.classList.add('dark');}var s=localStorage.getItem('finbud-skin');if(s==='almanac'){d.setAttribute('data-skin','almanac');}}catch(e){}})();`;
+const themeScript = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('finbud-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){d.classList.add('dark');}var s=localStorage.getItem('finbud-skin');if(s&&s!=='refined'){d.setAttribute('data-skin',s);}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

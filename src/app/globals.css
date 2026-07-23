@@ -110,6 +110,59 @@
   --shadow-pop: 0 16px 48px -14px rgb(0 0 0 / 0.75);
 }
 
+/* ------------------------------------------------------------------ */
+/* Accent skins — palette-only re-skins (neutrals + accent). Semantic  */
+/* colors (positive/negative/warning) inherit from :root / .dark.      */
+/* ------------------------------------------------------------------ */
+
+/* Midnight — cool slate + electric sky. */
+:root[data-skin="midnight"]:not(.dark) {
+  --bg: 244 246 251; --surface: 255 255 255; --surface-2: 238 241 247;
+  --border: 219 225 236; --muted: 84 94 112; --fg: 19 23 34;
+  --brand: 14 145 214; --brand-soft: 222 240 252;
+}
+:root.dark[data-skin="midnight"] {
+  --bg: 11 16 32; --surface: 18 26 46; --surface-2: 26 36 64;
+  --border: 40 53 84; --muted: 148 163 184; --fg: 232 238 252;
+  --brand: 56 189 248; --brand-soft: 16 36 59;
+}
+
+/* Sunset — warm sand + persimmon. */
+:root[data-skin="sunset"]:not(.dark) {
+  --bg: 251 246 241; --surface: 255 255 255; --surface-2: 246 237 228;
+  --border: 236 220 205; --muted: 105 91 80; --fg: 36 26 20;
+  --brand: 222 98 44; --brand-soft: 253 231 216;
+}
+:root.dark[data-skin="sunset"] {
+  --bg: 26 20 16; --surface: 36 27 21; --surface-2: 46 35 27;
+  --border: 61 47 36; --muted: 183 165 149; --fg: 243 232 222;
+  --brand: 242 129 79; --brand-soft: 58 39 26;
+}
+
+/* Grape — cool porcelain + violet. */
+:root[data-skin="grape"]:not(.dark) {
+  --bg: 247 246 251; --surface: 255 255 255; --surface-2: 240 238 248;
+  --border: 226 221 240; --muted: 89 84 110; --fg: 28 24 48;
+  --brand: 124 58 237; --brand-soft: 237 228 254;
+}
+:root.dark[data-skin="grape"] {
+  --bg: 18 15 28; --surface: 27 23 40; --surface-2: 36 31 54;
+  --border: 52 45 76; --muted: 167 159 192; --fg: 236 231 250;
+  --brand: 167 139 250; --brand-soft: 42 33 64;
+}
+
+/* Ocean — calm teal. */
+:root[data-skin="ocean"]:not(.dark) {
+  --bg: 242 248 247; --surface: 255 255 255; --surface-2: 232 242 240;
+  --border: 211 230 226; --muted: 77 99 94; --fg: 16 32 28;
+  --brand: 13 138 126; --brand-soft: 214 242 238;
+}
+:root.dark[data-skin="ocean"] {
+  --bg: 10 22 20; --surface: 17 35 32; --surface-2: 23 46 42;
+  --border: 35 66 60; --muted: 147 176 170; --fg: 228 242 238;
+  --brand: 45 212 191; --brand-soft: 16 48 41;
+}
+
 /* Almanac gives headings a warm serif and Fitch a handwritten voice. */
 :root[data-skin="almanac"] h1,
 :root[data-skin="almanac"] h2,
@@ -126,6 +179,36 @@
   font-size: 1.2rem;
   line-height: 1.25;
   color: rgb(var(--persimmon));
+}
+
+/* Almanac only: budget cards look like paper envelopes (flap + seam). */
+:root[data-skin="almanac"] .budget-group {
+  position: relative;
+  padding-top: 1.7rem;
+}
+:root[data-skin="almanac"] .budget-group::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1.5rem;
+  background:
+    linear-gradient(152deg, transparent calc(50% - 0.6px), rgb(var(--border)) 50%, transparent calc(50% + 0.6px)),
+    linear-gradient(208deg, transparent calc(50% - 0.6px), rgb(var(--border)) 50%, transparent calc(50% + 0.6px));
+  opacity: 0.55;
+  pointer-events: none;
+  border-radius: 0.7rem 0.7rem 0 0;
+}
+
+/* Almanac only: goals fill up as jars instead of a bar. */
+.goal-jar {
+  display: none;
+}
+:root[data-skin="almanac"] .goal-jar {
+  display: flex;
+  justify-content: center;
+}
+:root[data-skin="almanac"] .goal-bar {
+  display: none;
 }
 
 * {

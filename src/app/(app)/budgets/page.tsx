@@ -117,7 +117,7 @@ export default async function BudgetsPage({ searchParams }: { searchParams: Prom
           const childTotal = g.children.reduce((sum, c) => sum + c.limitCents, 0);
           const overParent = g.parent.limitCents > 0 && childTotal > g.parent.limitCents;
           return (
-            <div key={g.parent.categoryId} className="card px-4 py-2">
+            <div key={g.parent.categoryId} className="budget-group card px-4 py-2">
               <Row row={g.parent} month={month} currency={currency} />
 
               {g.children.length > 0 ? (
