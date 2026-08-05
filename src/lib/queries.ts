@@ -13,6 +13,8 @@ import {
   type Txn,
 } from "./budget";
 import { netWorthSeries } from "./networth";
+import { detectRecurring, merchantKey, upcomingOccurrences } from "./recurring";
+import { forecastMonth } from "./forecast";
 import {
   ACHIEVEMENTS,
   levelForPoints,
@@ -403,6 +405,85 @@ export async function getBudgetView(userId: string, month: string = currentMonth
     });
 
   return { month, groups, summary: overview.summary, incomeCents: overview.incomeCents };
+}
+
+/** Recurring series detected from the last `months` of history. */
+export async function getRecurring(userId: string, months = 6) {
+  const keys = lastMonths(months);
+  const { start } = monthRange(keys[0]);
+  const txns = await prisma.transaction.findMany({
+    where: { userId, date: { gte: start } },
+    select: { id: true, date: true, amountCents: true, merchant: true, categoryId: true, isTransfer: true },
+    orderBy: { date: "asc" },
+  });
+  return detectRecurring(txns);
+}
+
+/**
+ * Everything the calendar needs for a month: each day's actual transactions
+ * plus projected recurring items for days still to come.
+ */
+export async function getCalendarMonth(userId: string, month: string = currentMonthKey()) {
+  const { start, end } = monthRange(month);
+  const [txns, series, catMap] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId, date: { gte: start, lte: end } },
+      include: { account: true, category: true },
+      orderBy: { date: "asc" },
+    }),
+    getRecurring(userId),
+    getCategoryMap(userId),
+  ]);
+
+  // Project recurring items from tomorrow (or the month start, for future
+  // months) through the end of the month.
+  const now = new Date();
+  const projectFrom = now > start ? new Date(Math.min(now.getTime() + 86_400_000, end.getTime())) : start;
+  const projected = projectFrom <= end ? upcomingOccurrences(series, projectFrom, end) : [];
+
+  return { month, start, end, txns, series, projected, catMap };
+}
+
+/** Projected end-of-month position for the current month. */
+export async function getForecast(userId: string, month: string = currentMonthKey()) {
+  const { start, end } = monthRange(month);
+  const [txns, series] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId, date: { gte: start, lte: end }, isTransfer: false },
+      select: { date: true, amountCents: true, merchant: true },
+    }),
+    getRecurring(userId),
+  ]);
+
+  const recurringKeys = new Set(series.map((s) => s.key));
+  let incomeSoFarCents = 0;
+  let spendingSoFarCents = 0;
+  let variableSpendSoFarCents = 0;
+  for (const t of txns) {
+    if (t.amountCents > 0) incomeSoFarCents += t.amountCents;
+    else {
+      const spend = -t.amountCents;
+      spendingSoFarCents += spend;
+      if (!recurringKeys.has(merchantKey(t.merchant))) variableSpendSoFarCents += spend;
+    }
+  }
+
+  const now = new Date();
+  const daysInMonth = end.getUTCDate();
+  const inThisMonth = now >= start && now <= end;
+  const daysElapsed = inThisMonth ? now.getUTCDate() : daysInMonth;
+  const from = inThisMonth ? new Date(now.getTime() + 86_400_000) : end;
+
+  return forecastMonth({
+    incomeSoFarCents,
+    spendingSoFarCents,
+    variableSpendSoFarCents,
+    daysElapsed,
+    daysInMonth,
+    series,
+    from,
+    to: end,
+  });
 }
 
 export type GoalView = Awaited<ReturnType<typeof prisma.goal.findMany>>[number] & {

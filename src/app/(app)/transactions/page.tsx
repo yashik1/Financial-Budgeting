@@ -7,7 +7,7 @@ import { kindLabel } from "@/lib/accountTypes";
 import { TransactionList } from "@/components/app/TransactionList";
 import type { TxnItem } from "@/components/app/TransactionItem";
 import type { CatOption } from "@/components/app/CategorySelect";
-import { Upload, Search, X, Tag } from "lucide-react";
+import { Upload, Download, Search, X, Tag } from "lucide-react";
 
 type SP = {
   category?: string;
@@ -80,9 +80,14 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <h1 className="text-2xl font-extrabold tracking-tight">Transactions</h1>
           <p className="text-sm text-muted">Filter, edit, tag — or <strong>Select</strong> to edit many at once</p>
         </div>
-        <Link href="/accounts/import" className="btn-primary">
-          <Upload className="h-4 w-4" /> Import CSV
-        </Link>
+        <div className="flex items-center gap-2">
+          <a href={qs(sp, {}).replace("/transactions", "/transactions/export")} className="btn-ghost">
+            <Download className="h-4 w-4" /> Export CSV
+          </a>
+          <Link href="/accounts/import" className="btn-primary">
+            <Upload className="h-4 w-4" /> Import CSV
+          </Link>
+        </div>
       </header>
 
       {/* Filters */}

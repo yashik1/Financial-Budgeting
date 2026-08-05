@@ -35,6 +35,12 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
   donut, budget progress, financial-health score, and the mascot with your streak + monthly challenge.
 - **Monthly insights** — a **month switcher** on the dashboard and budgets pages plus a
   comparison card: income/spending/saved vs the previous month and the biggest category movers.
+- **Calendar & recurring** — bills, subscriptions, and income on a monthly calendar. FinBud
+  **detects recurring charges automatically** from your history (cadence + next due date), shows
+  upcoming ones as "expected", and lists your bills/subscriptions with a monthly total.
+- **Cash-flow forecast** — "where you'll land": projected month-end position from actuals so far,
+  the recurring bills still due, and your typical daily spending. On the dashboard and calendar.
+- **CSV export** — download the current (filtered) transaction view as CSV.
 - **Transactions** — **rich filters** (search, income/expense/transfer, category, tag,
   account, account type — e.g. just your credit card — and date range), free-form **#tags**
   with a **tags-in-use** bar and one-tap reuse, one-tap (sub)categorization, and inline

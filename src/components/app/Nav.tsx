@@ -12,6 +12,7 @@ import {
   Sparkles,
   Users,
   Settings,
+  CalendarDays,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -20,6 +21,7 @@ const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: Receipt },
   { href: "/budgets", label: "Budgets", icon: Wallet },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/household", label: "Household", icon: Users },

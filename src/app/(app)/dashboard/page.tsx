@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
-import { getDashboard, getGoals, type MoneyDelta } from "@/lib/queries";
+import { getDashboard, getGoals, getForecast, type MoneyDelta } from "@/lib/queries";
 import { formatCents, safeCurrency } from "@/lib/money";
 import { addMonthsToKey, monthLabel, safeMonthKey } from "@/lib/dates";
 import { StatTile, SectionHeader } from "@/components/ui/StatTile";
@@ -39,7 +39,11 @@ export default async function DashboardPage({
   const month = safeMonthKey(sp.month);
   // Baseline for the comparison; anything invalid falls back to the previous month.
   const compare = safeMonthKey(sp.compare, addMonthsToKey(month, -1));
-  const [dash, goals] = await Promise.all([getDashboard(user.id, month, compare, currency), getGoals(user.id)]);
+  const [dash, goals, forecast] = await Promise.all([
+    getDashboard(user.id, month, compare, currency),
+    getGoals(user.id),
+    getForecast(user.id, month),
+  ]);
   const { accounts, overview, trend, cashflow, game, mascot, challenge, comparison } = dash;
   const baselineLabel = comparison.prevMonth === addMonthsToKey(month, -1) ? "last month" : monthLabel(comparison.prevMonth);
 
@@ -146,6 +150,32 @@ export default async function DashboardPage({
           <section className="card p-5" aria-label="Monthly insights">
             <SectionHeader title="Monthly insights" hint={monthLabel(overview.month)} />
             <MonthComparison data={comparison} currency={currency} />
+          </section>
+
+          <section className="card p-5" aria-label="Month-end forecast">
+            <SectionHeader
+              title="Where you'll land"
+              hint={forecast.daysLeft > 0 ? `${forecast.daysLeft} days left in ${monthLabel(overview.month)}` : monthLabel(overview.month)}
+              action={
+                <Link href="/calendar" className="chip text-brand hover:underline">
+                  Calendar <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              }
+            />
+            <p className={`text-2xl font-extrabold tabular ${forecast.projectedNetCents >= 0 ? "text-positive" : "text-negative"}`}>
+              {formatCents(forecast.projectedNetCents, { currency, signed: true })}
+            </p>
+            <p className="mt-1 text-xs text-muted">projected saved at month end</p>
+            <ul className="mt-3 space-y-1.5 text-sm">
+              <li className="flex items-center justify-between">
+                <span className="text-muted">Bills still due</span>
+                <span className="tabular font-medium">{formatCents(forecast.upcomingBillsCents, { currency, compact: true })}</span>
+              </li>
+              <li className="flex items-center justify-between">
+                <span className="text-muted">Typical spending left</span>
+                <span className="tabular font-medium">{formatCents(forecast.estimatedVariableCents, { currency, compact: true })}</span>
+              </li>
+            </ul>
           </section>
 
           <section className="card p-5" aria-label="Goals">
