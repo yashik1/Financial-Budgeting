@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { safeCurrency } from "@/lib/money";
 import { CsvImporter } from "@/components/app/CsvImporter";
 import { ArrowLeft, Download } from "lucide-react";
 
 export default async function ImportPage() {
   const user = await requireUser();
+  const currency = safeCurrency(user.currency);
   const accounts = await prisma.account.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "asc" },
@@ -28,7 +30,7 @@ export default async function ImportPage() {
         <Download className="h-3.5 w-3.5" /> Download a sample CSV to try
       </a>
 
-      <CsvImporter accounts={accounts} />
+      <CsvImporter accounts={accounts} currency={currency} />
     </div>
   );
 }

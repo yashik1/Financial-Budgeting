@@ -27,25 +27,27 @@ export async function buildFinancialContext(userId: string): Promise<string> {
     getGoals(userId),
   ]);
 
+  const currency = accounts.accounts[0]?.currency ?? "USD";
+
   const topCats = ov.categorySpend
     .slice(0, 6)
-    .map((c) => `  - ${c.name}: ${formatCents(c.cents)}`)
+    .map((c) => `  - ${c.name}: ${formatCents(c.cents, { currency })}`)
     .join("\n");
 
   const overBudget = ov.progress
     .filter((p) => p.over)
-    .map((p) => `  - ${ov.catMap.get(p.categoryId)?.name ?? "?"}: ${formatCents(p.spentCents)} spent of ${formatCents(p.limitCents)}`)
+    .map((p) => `  - ${ov.catMap.get(p.categoryId)?.name ?? "?"}: ${formatCents(p.spentCents, { currency })} spent of ${formatCents(p.limitCents, { currency })}`)
     .join("\n") || "  (none over budget)";
 
   const goalLines = goals
-    .map((g) => `  - ${g.name}: ${formatCents(g.savedCents)} of ${formatCents(g.targetCents)} (${Math.round((g.savedCents / g.targetCents) * 100)}%)`)
+    .map((g) => `  - ${g.name}: ${formatCents(g.fundedCents, { currency })} of ${formatCents(g.targetCents, { currency })} (${Math.round((g.fundedCents / g.targetCents) * 100)}%)`)
     .join("\n");
 
   return `CONTEXT — the user's money for ${monthLabel(ov.month)}:
-Net worth: ${formatCents(accounts.netWorthCents)} (assets ${formatCents(accounts.assetsCents)}, liabilities ${formatCents(accounts.liabilitiesCents)})
-This month — income: ${formatCents(ov.incomeCents)}, spending: ${formatCents(ov.spendingCents)}, net saved: ${formatCents(ov.netCents)}
+Net worth: ${formatCents(accounts.netWorthCents, { currency })} (assets ${formatCents(accounts.assetsCents, { currency })}, liabilities ${formatCents(accounts.liabilitiesCents, { currency })})
+This month — income: ${formatCents(ov.incomeCents, { currency })}, spending: ${formatCents(ov.spendingCents, { currency })}, net saved: ${formatCents(ov.netCents, { currency })}
 Financial-health score: ${ov.health}/100. On-budget streak: ${game.stats.savingsStreak} months.
-Budgeted ${formatCents(ov.summary.budgetedCents)}, spent ${formatCents(ov.summary.spentCents)} (${Math.round(ov.summary.pctUsed)}% used).
+Budgeted ${formatCents(ov.summary.budgetedCents, { currency })}, spent ${formatCents(ov.summary.spentCents, { currency })} (${Math.round(ov.summary.pctUsed)}% used).
 Top spending categories:
 ${topCats}
 Over budget:

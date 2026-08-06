@@ -14,7 +14,7 @@ import { formatCents } from "@/lib/money";
 
 type Account = { id: string; name: string };
 
-export function CsvImporter({ accounts }: { accounts: Account[] }) {
+export function CsvImporter({ accounts, currency = "USD" }: { accounts: Account[]; currency?: string }) {
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [mode, setMode] = useState<"single" | "split">("single");
@@ -156,7 +156,7 @@ export function CsvImporter({ accounts }: { accounts: Account[] }) {
                         <tr key={i} className="border-t border-border">
                           <td className="p-2">{r.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
                           <td className="p-2">{r.merchant}</td>
-                          <td className={`p-2 text-right tabular ${r.amountCents >= 0 ? "text-positive" : "text-fg"}`}>{formatCents(r.amountCents, { signed: true })}</td>
+                          <td className={`p-2 text-right tabular ${r.amountCents >= 0 ? "text-positive" : "text-fg"}`}>{formatCents(r.amountCents, { signed: true, currency })}</td>
                         </tr>
                       ))}
                     </tbody>
