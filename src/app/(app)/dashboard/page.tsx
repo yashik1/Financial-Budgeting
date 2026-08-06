@@ -202,6 +202,9 @@ export default async function DashboardPage({
                     >
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: g.color }} />
                     </div>
+                    {g.projection?.etaMonth && pct < 100 && (
+                      <p className="mt-1 text-xs text-muted">Projected {monthLabel(g.projection.etaMonth)}</p>
+                    )}
                   </li>
                 );
               })}

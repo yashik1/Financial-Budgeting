@@ -435,3 +435,67 @@ export async function deleteAccount(accountId: string) {
   revalidatePath("/dashboard");
   revalidatePath("/transactions");
 }
+
+/** Above any built-in rule's priority (which is just its keyword length). */
+const USER_RULE_PRIORITY = 1000;
+
+/** A merchant keyword → category rule, applied to everything imported from here on. */
+export async function createRule(formData: FormData) {
+  const user = await requireUser();
+  const matcher = String(formData.get("matcher") || "").trim();
+  const categoryId = String(formData.get("categoryId") || "");
+  if (!matcher || !categoryId) return;
+  const cat = await prisma.category.findFirst({ where: { id: categoryId, userId: user.id } });
+  if (!cat) return;
+
+  // High priority so a rule you wrote beats the built-in guess for the same keyword.
+  const existing = await prisma.rule.findFirst({ where: { userId: user.id, matcher, builtIn: false } });
+  if (existing) await prisma.rule.update({ where: { id: existing.id }, data: { categoryId } });
+  else await prisma.rule.create({ data: { userId: user.id, matcher, categoryId, priority: USER_RULE_PRIORITY } });
+
+  revalidatePath("/transactions/rules");
+}
+
+export async function deleteRule(ruleId: string) {
+  const user = await requireUser();
+  await prisma.rule.deleteMany({ where: { id: ruleId, userId: user.id } });
+  revalidatePath("/transactions/rules");
+}
+
+/**
+ * Run the rules over transactions that never got a category. Deliberately
+ * skips already-categorized rows so a new rule can't silently rewrite history.
+ */
+export async function applyRulesToUncategorized() {
+  const user = await requireUser();
+  const rules = await prisma.rule.findMany({ where: { userId: user.id } });
+  if (!rules.length) return { updated: 0 };
+  const ruleList = rules.map((r) => ({ matcher: r.matcher, category: r.categoryId, priority: r.priority }));
+
+  const pending = await prisma.transaction.findMany({
+    where: { userId: user.id, categoryId: null, isTransfer: false },
+    select: { id: true, merchant: true, rawDescription: true },
+  });
+
+  const byCategory = new Map<string, string[]>();
+  for (const t of pending) {
+    const categoryId = categorize(`${t.merchant} ${t.rawDescription ?? ""}`, ruleList);
+    if (!categoryId) continue;
+    byCategory.set(categoryId, [...(byCategory.get(categoryId) ?? []), t.id]);
+  }
+
+  let updated = 0;
+  for (const [categoryId, ids] of byCategory) {
+    const res = await prisma.transaction.updateMany({
+      where: { id: { in: ids }, userId: user.id },
+      data: { categoryId },
+    });
+    updated += res.count;
+  }
+
+  revalidatePath("/transactions/rules");
+  revalidatePath("/transactions");
+  revalidatePath("/budgets");
+  revalidatePath("/dashboard");
+  return { updated };
+}

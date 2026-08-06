@@ -15,6 +15,8 @@ import {
 import { netWorthSeries } from "./networth";
 import { detectRecurring, merchantKey, upcomingOccurrences } from "./recurring";
 import { forecastMonth } from "./forecast";
+import { categoryTrend, monthlyRows, periodTotals, topMerchants, type ReportTxn } from "./reports";
+import { contributionRate, projectGoal, type GoalProjection } from "./goals";
 import {
   ACHIEVEMENTS,
   levelForPoints,
@@ -489,24 +491,122 @@ export async function getForecast(userId: string, month: string = currentMonthKe
 export type GoalView = Awaited<ReturnType<typeof prisma.goal.findMany>>[number] & {
   fundedCents: number;
   accountName: string | null;
+  projection: GoalProjection | null;
 };
 
+/** How far back we look to work out how fast a goal's account is growing. */
+const GOAL_RATE_MONTHS = 6;
+
 /**
- * Goals with their effective funded amount. When a goal is linked to an
- * account, progress tracks that account's (asset) balance; otherwise it falls
- * back to any manually-stored amount.
+ * Goals with their effective funded amount and a projected finish date. When a
+ * goal is linked to an account, progress tracks that account's (asset) balance
+ * and the ETA comes from that account's recent net inflow; otherwise it falls
+ * back to any manually-stored amount and has no projection to offer.
  */
 export async function getGoals(userId: string): Promise<GoalView[]> {
   const goals = await prisma.goal.findMany({
     where: { userId },
-    include: { account: { select: { name: true, balanceCents: true, isAsset: true } } },
+    include: { account: { select: { id: true, name: true, balanceCents: true, isAsset: true } } },
     orderBy: { createdAt: "asc" },
   });
-  return goals.map(({ account, ...g }) => ({
-    ...g,
-    fundedCents: account ? Math.max(0, account.balanceCents) : g.savedCents,
-    accountName: account?.name ?? null,
+
+  const accountIds = [...new Set(goals.map((g) => g.account?.id).filter((id): id is string => !!id))];
+  const rateByAccount = new Map<string, number>();
+  if (accountIds.length) {
+    const months = lastMonths(GOAL_RATE_MONTHS);
+    const { start } = monthRange(months[0]);
+    const { end } = monthRange(months[months.length - 1]);
+    // Transfers count here: moving money into savings is how a goal gets funded.
+    const flows = await prisma.transaction.groupBy({
+      by: ["accountId"],
+      where: { userId, accountId: { in: accountIds }, date: { gte: start, lte: end } },
+      _sum: { amountCents: true },
+    });
+    for (const f of flows) {
+      rateByAccount.set(f.accountId, contributionRate([f._sum.amountCents ?? 0], GOAL_RATE_MONTHS));
+    }
+  }
+
+  const fromMonth = currentMonthKey();
+  return goals.map(({ account, ...g }) => {
+    const fundedCents = account ? Math.max(0, account.balanceCents) : g.savedCents;
+    return {
+      ...g,
+      fundedCents,
+      accountName: account?.name ?? null,
+      projection: account
+        ? projectGoal({
+            fundedCents,
+            targetCents: g.targetCents,
+            monthlyRateCents: rateByAccount.get(account.id) ?? 0,
+            fromMonth,
+            deadline: g.deadline,
+          })
+        : null,
+    };
+  });
+}
+
+/**
+ * Everything the /reports page needs: per-month cash flow across the window,
+ * period totals, category trends (rolled up to top level), and top merchants.
+ */
+export async function getReports(userId: string, months = 6, endMonth: string = currentMonthKey()) {
+  const keys = lastMonths(months, endMonth);
+  const { start } = monthRange(keys[0]);
+  const { end } = monthRange(keys[keys.length - 1]);
+
+  const [txns, catMap, accountsOverview] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId, date: { gte: start, lte: end } },
+      select: { date: true, amountCents: true, categoryId: true, merchant: true, isTransfer: true },
+    }),
+    getCategoryMap(userId),
+    getAccountsOverview(userId),
+  ]);
+
+  // Resolve every category to its top-level ancestor so a report never counts a
+  // parent and its subcategory as two separate lines.
+  const topLevelOf = new Map<string, string>();
+  for (const c of catMap.values()) {
+    let cur: CategoryMeta | undefined = c;
+    const seen = new Set<string>();
+    while (cur?.parentId && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = catMap.get(cur.parentId);
+    }
+    topLevelOf.set(c.id, cur?.id ?? c.id);
+  }
+
+  const reportTxns: ReportTxn[] = txns.map((t) => ({
+    month: monthKey(t.date),
+    amountCents: t.amountCents,
+    categoryId: t.categoryId ? topLevelOf.get(t.categoryId) ?? t.categoryId : null,
+    merchant: t.merchant,
+    isTransfer: t.isTransfer,
   }));
+
+  const rows = monthlyRows(reportTxns, keys);
+  const trend = categoryTrend(reportTxns, keys).map((r) => {
+    const meta = catMap.get(r.categoryId);
+    return {
+      ...r,
+      name: meta?.name ?? "Uncategorized",
+      icon: meta?.icon ?? "❓",
+      color: meta?.color ?? "#7A879C",
+    };
+  });
+
+  return {
+    months: keys,
+    rows,
+    totals: periodTotals(rows),
+    trend,
+    merchants: topMerchants(reportTxns),
+    assetsCents: accountsOverview.assetsCents,
+    liabilitiesCents: accountsOverview.liabilitiesCents,
+    netWorthCents: accountsOverview.netWorthCents,
+  };
 }
 
 /**

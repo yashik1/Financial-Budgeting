@@ -43,6 +43,7 @@ export async function provisionUserDefaults(userId: string): Promise<void> {
       matcher: r.matcher,
       categoryId: byName.get(r.category) ?? fallback,
       priority: r.matcher.length,
+      builtIn: true,
     })),
   });
   await prisma.userStats.create({ data: { userId, points: 0, level: 1 } });

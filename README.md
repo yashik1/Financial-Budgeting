@@ -41,14 +41,20 @@ iOS-locked. **FinBud targets fun + deep + runs anywhere in a browser.**
 - **Cash-flow forecast** — "where you'll land": projected month-end position from actuals so far,
   the recurring bills still due, and your typical daily spending. On the dashboard and calendar.
 - **CSV export** — download the current (filtered) transaction view as CSV.
+- **Reports** — a 3/6/12-month view of income vs spending, savings rate month by month,
+  **category trends** (each category's shape over time, with the latest month scored against its
+  own average), **top merchants**, and an **assets vs liabilities** breakdown.
 - **Transactions** — **rich filters** (search, income/expense/transfer, category, tag,
   account, account type — e.g. just your credit card — and date range), free-form **#tags**
   with a **tags-in-use** bar and one-tap reuse, one-tap (sub)categorization, and inline
   **edit + notes + delete**; auto-categorized on import.
+- **Categorization rules** — teach FinBud where a merchant belongs and it sticks on every future
+  import, sync, and manual entry. Your rules override the ~110 built-in ones, and **Apply to
+  uncategorized** sorts your backlog in one click (it never rewrites categories you already set).
 - **Budgets** — envelope budgeting with **categories & collapsible subcategories** (e.g. Transportation → Gas, Oil Change, Tires — click a category to expand), inline-editable limits, parent roll-ups, and live progress. Subcategory limits **can't exceed their parent** (you get a clear error), and an **Uncategorized** section surfaces spending that isn't in any budget so you can sort it.
 - **Currency** — pick any of the world's currencies in Settings; amounts re-format everywhere with the right symbol and decimal rules (e.g. ¥ has none). Display-only — no FX conversion.
 - **Accounts** — grouped by institution; **edit any account inline** (name, institution, type, balance, currency, sharing) or delete it. Types are **global**: a universal *kind* plus country-specific *products* — Canada's RRSP/TFSA/FHSA, US 401(k)/IRA/HSA, UK ISA/SIPP, AU Super — driven by a code catalog (`src/lib/accountTypes.ts`) and your **home country** (Settings), with any country selectable per account.
-- **Goals** — create and **edit** savings goals (name, target, date, icon) and **link each to a funding account** so progress tracks that account's balance automatically — no manual top-ups.
+- **Goals** — create and **edit** savings goals (name, target, date, icon) and **link each to a funding account** so progress tracks that account's balance automatically — no manual top-ups. FinBud reads how fast that account is actually growing and **projects the finish date**, flagging whether you're on track for your target date.
 - **Accounts** — grouped by institution; add manually, load demo accounts, or **import CSV/OFV**.
 - **CSV import** — upload a bank/brokerage export, map columns (single-amount or debit/credit),
   preview, and import with automatic categorization.

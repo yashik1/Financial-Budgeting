@@ -13,6 +13,7 @@ import {
   Users,
   Settings,
   CalendarDays,
+  BarChart3,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -22,6 +23,7 @@ const LINKS = [
   { href: "/transactions", label: "Transactions", icon: Receipt },
   { href: "/budgets", label: "Budgets", icon: Wallet },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/household", label: "Household", icon: Users },

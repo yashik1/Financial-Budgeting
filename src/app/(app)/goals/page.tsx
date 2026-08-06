@@ -4,7 +4,8 @@ import { getGoals } from "@/lib/queries";
 import { formatCents, safeCurrency, currencySymbol } from "@/lib/money";
 import { createGoal } from "@/app/(app)/actions";
 import { GoalEditor } from "@/components/app/GoalEditor";
-import { Sparkles, Landmark } from "lucide-react";
+import { monthLabel } from "@/lib/dates";
+import { Sparkles, Landmark, CalendarClock } from "lucide-react";
 
 export default async function GoalsPage() {
   const user = await requireUser();
@@ -120,6 +121,32 @@ export default async function GoalsPage() {
                   <Landmark className="h-3.5 w-3.5" />
                   {g.accountName ? `Funded by ${g.accountName}` : "Not linked — edit to pick an account"}
                 </div>
+
+                {g.projection && !done && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2 text-xs">
+                    {g.projection.etaMonth ? (
+                      <>
+                        <span className="flex items-center gap-1.5 text-muted">
+                          <CalendarClock className="h-3.5 w-3.5" />
+                          Projected {monthLabel(g.projection.etaMonth)}
+                        </span>
+                        <span className="tabular text-muted">
+                          {formatCents(g.projection.monthlyRateCents, { currency, compact: true })}/mo
+                        </span>
+                        {g.projection.onTrack !== null && (
+                          <span className={`chip ${g.projection.onTrack ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"}`}>
+                            {g.projection.onTrack ? "On track" : "Behind"}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-muted">
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        {g.accountName} isn’t growing yet — no finish date to project
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );

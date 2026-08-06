@@ -190,6 +190,8 @@ model Rule {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   priority   Int      @default(0)
+  // Seeded starter rules, kept separate from the ones the user writes.
+  builtIn    Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   @@index([userId])

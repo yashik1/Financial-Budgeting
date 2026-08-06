@@ -80,6 +80,7 @@ async function main() {
       matcher: r.matcher,
       categoryId: categoryByName.get(r.category) ?? uncategorizedId,
       priority: r.matcher.length,
+      builtIn: true,
     })),
   });
 
