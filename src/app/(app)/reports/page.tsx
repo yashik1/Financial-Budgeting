@@ -5,6 +5,7 @@ import { formatCents, safeCurrency } from "@/lib/money";
 import { monthLabel, shortMonthLabel } from "@/lib/dates";
 import { StatTile, SectionHeader } from "@/components/ui/StatTile";
 import { CashflowChart } from "@/components/charts/CashflowChart";
+import { NetWorthChart } from "@/components/charts/NetWorthChart";
 import { TrendingUp, TrendingDown, PiggyBank, Scale, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 const RANGES = [3, 6, 12] as const;
@@ -33,7 +34,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const months = safeMonths(sp.months);
 
-  const { rows, totals, trend, merchants, assetsCents, liabilitiesCents, netWorthCents } = await getReports(
+  const { rows, totals, trend, merchants, netWorthTrend, assetsCents, liabilitiesCents, netWorthCents } = await getReports(
     user.id,
     months,
   );
@@ -104,6 +105,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <section className="card p-5" aria-label="Income versus spending">
             <SectionHeader title="Income vs spending" hint={`Last ${months} months`} />
             <CashflowChart data={rows} currency={currency} />
+          </section>
+
+          <section className="card p-5" aria-label="Net worth trend">
+            <SectionHeader title="Net worth over time" hint={`Last ${months} months`} />
+            <NetWorthChart data={netWorthTrend} currency={currency} />
           </section>
 
           <section className="card p-5" aria-label="Category trends">

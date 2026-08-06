@@ -5,6 +5,7 @@ export type Txn = {
   amountCents: number; // signed: negative = spend, positive = income
   categoryId: string | null;
   isTransfer?: boolean;
+  excludeFromBudget?: boolean;
 };
 
 export type BudgetLineInput = {
@@ -12,7 +13,7 @@ export type BudgetLineInput = {
   limitCents: number;
 };
 
-const spendable = (t: Txn) => !t.isTransfer;
+const spendable = (t: Txn) => !t.isTransfer && !t.excludeFromBudget;
 
 /** Total income (sum of inflows), as positive cents. */
 export function totalIncome(txns: Txn[]): number {

@@ -133,6 +133,13 @@ model Transaction {
   isTransfer     Boolean  @default(false)
   notes          String?
   tags           String[] @default([]) // free-form labels for filtering
+  // A contribution toward a goal (e.g. a transfer into a savings jar). When the
+  // goal has no linked account, tagged transactions are how it gets funded.
+  goalId         String?
+  goal           Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  // Kept out of budget progress and spending reports — a one-off that
+  // shouldn't skew a normal month, without hiding it from the ledger.
+  excludeFromBudget Boolean @default(false)
   // Splits: a child references its parent; parent keeps the original amount.
   splitParentId  String?
   splitParent    Transaction?  @relation("Splits", fields: [splitParentId], references: [id])
@@ -145,6 +152,7 @@ model Transaction {
   @@index([accountId])
   @@index([categoryId])
   @@index([externalId])
+  @@index([goalId])
 }
 
 // Envelope / zero-based budgeting: one limit per category per month.
@@ -175,6 +183,8 @@ model Goal {
   // Optional funding account: progress tracks this account's balance.
   accountId  String?
   account    Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  // Without a linked account, progress instead sums transactions tagged here.
+  contributions Transaction[]
   createdAt  DateTime  @default(now())
 
   @@index([userId])

@@ -6,7 +6,7 @@ import { recategorizeTransaction } from "@/app/(app)/actions";
 export type CatOption = { id: string; name: string; icon: string; parentId: string | null };
 
 /** Renders parents as <optgroup>s with their subcategories nested underneath. */
-function Options({ categories }: { categories: CatOption[] }) {
+export function CategoryOptionGroups({ categories }: { categories: CatOption[] }) {
   const tops = categories.filter((c) => !c.parentId);
   const childrenOf = new Map<string, CatOption[]>();
   for (const c of categories) {
@@ -64,7 +64,7 @@ export function CategorySelect({
       }
     >
       <option value="">❓ Uncategorized</option>
-      <Options categories={categories} />
+      <CategoryOptionGroups categories={categories} />
     </select>
   );
 }

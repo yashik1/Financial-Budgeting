@@ -7,6 +7,7 @@ import { kindLabel } from "@/lib/accountTypes";
 import { TransactionList } from "@/components/app/TransactionList";
 import type { TxnItem } from "@/components/app/TransactionItem";
 import type { CatOption } from "@/components/app/CategorySelect";
+import type { AccountOption, GoalOption } from "@/components/app/AddTransactionForm";
 import { Upload, Download, Search, X, Tag, Wand2 } from "lucide-react";
 
 type SP = {
@@ -44,11 +45,14 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     limit: 300,
   };
 
-  const [txns, categories, accounts, usedTags] = await Promise.all([
+  const [txns, categories, accounts, usedTags, goals] = await Promise.all([
     getTransactions(user.id, filters),
     prisma.category.findMany({ where: { userId: user.id }, orderBy: { sort: "asc" } }),
     prisma.account.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
     getUsedTags(user.id),
+    // Only goals without a linked account take tagged-transaction contributions
+    // (an account-linked goal's progress already tracks that account's balance).
+    prisma.goal.findMany({ where: { userId: user.id, accountId: null }, orderBy: { createdAt: "asc" } }),
   ]);
 
   const catOptions: CatOption[] = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, parentId: c.parentId }));
@@ -71,7 +75,14 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     isTransfer: t.isTransfer,
     notes: t.notes,
     tags: t.tags,
+    goalId: t.goalId,
+    goalName: t.goal?.name ?? null,
+    goalEmoji: t.goal?.emoji ?? null,
+    excludeFromBudget: t.excludeFromBudget,
   }));
+
+  const accountOptions: AccountOption[] = accounts.map((a) => ({ id: a.id, label: `${a.name} · ${a.institution}` }));
+  const goalOptions: GoalOption[] = goals.map((g) => ({ id: g.id, emoji: g.emoji, name: g.name }));
 
   return (
     <div className="space-y-5">
@@ -191,8 +202,15 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      {/* List + bulk edit */}
-      <TransactionList txns={txnItems} categories={catOptions} currency={currency} knownTags={tagNames} />
+      {/* Add + list + bulk edit */}
+      <TransactionList
+        txns={txnItems}
+        categories={catOptions}
+        accounts={accountOptions}
+        goals={goalOptions}
+        currency={currency}
+        knownTags={tagNames}
+      />
     </div>
   );
 }

@@ -3,38 +3,23 @@
 import { useMemo, useState, useTransition } from "react";
 import { CheckSquare, Tag, Trash2, X } from "lucide-react";
 import { TransactionItem, type TxnItem } from "./TransactionItem";
-import type { CatOption } from "./CategorySelect";
+import { CategoryOptionGroups, type CatOption } from "./CategorySelect";
+import type { AccountOption, GoalOption } from "./AddTransactionForm";
+import { AddTransactionForm } from "./AddTransactionForm";
 import { bulkCategorize, bulkAddTag, bulkDeleteTransactions } from "@/app/(app)/actions";
-
-/** Nested <option>s (parents as optgroups) for the bulk categorize picker. */
-function CategoryOptions({ categories }: { categories: CatOption[] }) {
-  const tops = categories.filter((c) => !c.parentId);
-  const kids = new Map<string, CatOption[]>();
-  for (const c of categories) if (c.parentId) kids.set(c.parentId, [...(kids.get(c.parentId) ?? []), c]);
-  return (
-    <>
-      {tops.map((t) => {
-        const cs = kids.get(t.id) ?? [];
-        if (!cs.length) return <option key={t.id} value={t.id}>{t.icon} {t.name}</option>;
-        return (
-          <optgroup key={t.id} label={`${t.icon} ${t.name}`}>
-            <option value={t.id}>{t.icon} {t.name} (all)</option>
-            {cs.map((c) => <option key={c.id} value={c.id}>&nbsp;&nbsp;{c.icon} {c.name}</option>)}
-          </optgroup>
-        );
-      })}
-    </>
-  );
-}
 
 export function TransactionList({
   txns,
   categories,
+  accounts,
+  goals,
   currency,
   knownTags,
 }: {
   txns: TxnItem[];
   categories: CatOption[];
+  accounts: AccountOption[];
+  goals: GoalOption[];
   currency?: string;
   knownTags: string[];
 }) {
@@ -70,6 +55,8 @@ export function TransactionList({
 
   return (
     <div className="space-y-3">
+      <AddTransactionForm accounts={accounts} categories={categories} goals={goals} currency={currency} />
+
       {/* Select toggle */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">{txns.length} shown · tap a category to recategorize, ✏️ to edit</p>
@@ -100,7 +87,7 @@ export function TransactionList({
           >
             <option value="__">Set category…</option>
             <option value="">❓ Uncategorized</option>
-            <CategoryOptions categories={categories} />
+            <CategoryOptionGroups categories={categories} />
           </select>
 
           <div className="flex items-center gap-1">
@@ -137,6 +124,7 @@ export function TransactionList({
               key={t.id}
               txn={t}
               categories={categories}
+              goals={goals}
               currency={currency}
               knownTags={knownTags}
               selected={selectMode ? selected.has(t.id) : undefined}

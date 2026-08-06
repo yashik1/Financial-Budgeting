@@ -12,7 +12,10 @@ export type ReportTxn = {
   categoryId: string | null; // already rolled up to top level
   merchant: string;
   isTransfer?: boolean;
+  excludeFromBudget?: boolean;
 };
+
+const reportable = (t: ReportTxn) => !t.isTransfer && !t.excludeFromBudget;
 
 export type MonthRow = {
   month: string;
@@ -29,7 +32,7 @@ export function monthlyRows(txns: ReportTxn[], months: string[]): MonthRow[] {
     rows.set(month, { month, incomeCents: 0, spendingCents: 0, netCents: 0, savingsRate: 0 });
   }
   for (const t of txns) {
-    if (t.isTransfer) continue;
+    if (!reportable(t)) continue;
     const row = rows.get(t.month);
     if (!row) continue;
     if (t.amountCents > 0) row.incomeCents += t.amountCents;
@@ -98,7 +101,7 @@ export function categoryTrend(
   const byCat = new Map<string, number[]>();
 
   for (const t of txns) {
-    if (t.isTransfer || t.amountCents >= 0) continue;
+    if (!reportable(t) || t.amountCents >= 0) continue;
     const i = index.get(t.month);
     if (i === undefined) continue;
     const key = t.categoryId ?? "__uncategorized__";
@@ -139,7 +142,7 @@ export function topMerchants(txns: ReportTxn[], limit = 10): MerchantRow[] {
   const groups = new Map<string, { totalCents: number; count: number; names: Map<string, number> }>();
 
   for (const t of txns) {
-    if (t.isTransfer || t.amountCents >= 0) continue;
+    if (!reportable(t) || t.amountCents >= 0) continue;
     const key = merchantKey(t.merchant);
     if (!key) continue;
     let g = groups.get(key);

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getGoals } from "@/lib/queries";
 import { formatCents, safeCurrency, currencySymbol } from "@/lib/money";
 import { createGoal } from "@/app/(app)/actions";
-import { GoalEditor } from "@/components/app/GoalEditor";
+import { GoalEditor, GoalAccountOptions } from "@/components/app/GoalEditor";
 import { monthLabel } from "@/lib/dates";
 import { Sparkles, Landmark, CalendarClock } from "lucide-react";
 
@@ -12,7 +12,11 @@ export default async function GoalsPage() {
   const currency = safeCurrency(user.currency);
   const [goals, accounts] = await Promise.all([
     getGoals(user.id),
-    prisma.account.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }),
+    prisma.account.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, institution: true, type: true, subtype: true },
+    }),
   ]);
 
   const totalTarget = goals.reduce((s, g) => s + g.targetCents, 0);
@@ -24,7 +28,7 @@ export default async function GoalsPage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Goals</h1>
           <p className="text-sm text-muted">
-            {formatCents(totalSaved, { currency, compact: true })} toward {formatCents(totalTarget, { currency, compact: true })} · progress tracks the linked account
+            {formatCents(totalSaved, { currency, compact: true })} toward {formatCents(totalTarget, { currency, compact: true })} · link an account or tag transactions — no manual top-ups
           </p>
         </div>
       </header>
@@ -48,10 +52,8 @@ export default async function GoalsPage() {
         <div>
           <label className="label" htmlFor="accountId">Funded by</label>
           <select id="accountId" name="accountId" className="input" defaultValue="">
-            <option value="">Choose an account…</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
+            <option value="">No account — fund by tagging transactions</option>
+            <GoalAccountOptions accounts={accounts} />
           </select>
         </div>
         <div className="flex items-end">
@@ -119,8 +121,23 @@ export default async function GoalsPage() {
 
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
                   <Landmark className="h-3.5 w-3.5" />
-                  {g.accountName ? `Funded by ${g.accountName}` : "Not linked — edit to pick an account"}
+                  {g.accountName
+                    ? `Funded by ${g.accountName}`
+                    : g.contributions.length > 0
+                      ? "Funded by tagged transactions"
+                      : "Not linked — edit to pick an account, or tag a transaction to this goal"}
                 </div>
+
+                {!g.accountName && g.contributions.length > 0 && (
+                  <ul className="mt-1.5 space-y-0.5">
+                    {g.contributions.map((c) => (
+                      <li key={c.id} className="flex items-center justify-between text-xs text-muted">
+                        <span className="truncate">{c.merchant}</span>
+                        <span className="tabular">{formatCents(Math.abs(c.amountCents), { currency, compact: true })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 {g.projection && !done && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2 text-xs">
@@ -142,7 +159,7 @@ export default async function GoalsPage() {
                     ) : (
                       <span className="flex items-center gap-1.5 text-muted">
                         <CalendarClock className="h-3.5 w-3.5" />
-                        {g.accountName} isn’t growing yet — no finish date to project
+                        {g.accountName ? `${g.accountName} isn’t growing yet` : "No recent contributions"} — no finish date to project
                       </span>
                     )}
                   </div>

@@ -33,6 +33,16 @@ describe("budget math", () => {
     expect(map.has("sav")).toBe(false); // transfer excluded
   });
 
+  it("excludes a transaction marked off-budget, same as a transfer", () => {
+    const withExcluded: Txn[] = [
+      ...txns,
+      { amountCents: -900_000, categoryId: "misc", isTransfer: false, excludeFromBudget: true },
+    ];
+    // The $9,000 one-off doesn't move spending or the category breakdown.
+    expect(totalSpending(withExcluded)).toBe(193_000);
+    expect(spendingByCategory(withExcluded).has("misc")).toBe(false);
+  });
+
   it("computes budget progress and over state", () => {
     const map = spendingByCategory(txns);
     const progress = budgetProgress(

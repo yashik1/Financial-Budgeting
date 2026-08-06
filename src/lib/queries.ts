@@ -13,7 +13,7 @@ import {
   type Txn,
 } from "./budget";
 import { netWorthSeries } from "./networth";
-import { detectRecurring, merchantKey, upcomingOccurrences } from "./recurring";
+import { detectRecurring, merchantKey, monthlyCents, upcomingOccurrences } from "./recurring";
 import { forecastMonth } from "./forecast";
 import { categoryTrend, monthlyRows, periodTotals, topMerchants, type ReportTxn } from "./reports";
 import { contributionRate, projectGoal, type GoalProjection } from "./goals";
@@ -39,6 +39,21 @@ export async function getCategoryMap(userId: string): Promise<Map<string, Catego
   for (const c of cats)
     map.set(c.id, { id: c.id, name: c.name, icon: c.icon, color: c.color, group: c.group, parentId: c.parentId });
   return map;
+}
+
+/** Every category id → its top-level ancestor, so a parent and its subcategory never count as two lines. */
+function topLevelMap(catMap: Map<string, CategoryMeta>): Map<string, string> {
+  const topLevelOf = new Map<string, string>();
+  for (const c of catMap.values()) {
+    let cur: CategoryMeta | undefined = c;
+    const seen = new Set<string>();
+    while (cur?.parentId && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = catMap.get(cur.parentId);
+    }
+    topLevelOf.set(c.id, cur?.id ?? c.id);
+  }
+  return topLevelOf;
 }
 
 export async function getAccountsOverview(userId: string) {
@@ -69,6 +84,7 @@ export async function getMonthOverview(userId: string, month: string = currentMo
     amountCents: t.amountCents,
     categoryId: t.categoryId,
     isTransfer: t.isTransfer,
+    excludeFromBudget: t.excludeFromBudget,
   }));
 
   const incomeCents = totalIncome(asTxn);
@@ -307,7 +323,7 @@ export async function getTransactions(userId: string, opts: TxnFilters = {}) {
       ...dateWhere,
       ...(search ? { OR: [{ merchant: { contains: search, mode: "insensitive" } }, { rawDescription: { contains: search, mode: "insensitive" } }] } : {}),
     },
-    include: { account: true, category: true },
+    include: { account: true, category: true, goal: { select: { name: true, emoji: true } } },
     orderBy: { date: "desc" },
     take: limit,
   });
@@ -357,6 +373,8 @@ export type BudgetRow = {
   remainingCents: number;
   pct: number;
   over: boolean;
+  /** Whether this category has its own allocation (vs. showing only because a child does). */
+  hasLine: boolean;
 };
 
 export type BudgetGroup = { parent: BudgetRow; children: BudgetRow[] };
@@ -378,6 +396,7 @@ export async function getBudgetView(userId: string, month: string = currentMonth
       remainingCents: limitCents - spentCents,
       pct: limitCents > 0 ? (spentCents / limitCents) * 100 : 0,
       over: limitCents > 0 && spentCents > limitCents,
+      hasLine: limitByCat.has(c.id),
     };
   };
 
@@ -392,8 +411,14 @@ export async function getBudgetView(userId: string, month: string = currentMonth
     childrenByParent.set(c.parentId, list);
   }
 
-  const groups: BudgetGroup[] = cats
-    .filter((c) => !c.parentId)
+  const topLevel = cats.filter((c) => !c.parentId);
+  const isAllocated = (c: CategoryMeta) =>
+    limitByCat.has(c.id) || (childrenByParent.get(c.id) ?? []).some((child) => limitByCat.has(child.id));
+
+  // Envelopes: an explicit allocation, so the page shows what you set up, not
+  // every category that could theoretically be budgeted.
+  const groups: BudgetGroup[] = topLevel
+    .filter(isAllocated)
     .map((p) => ({
       parent: rowFor(p),
       children: (childrenByParent.get(p.id) ?? [])
@@ -401,12 +426,23 @@ export async function getBudgetView(userId: string, month: string = currentMonth
         .sort((a, b) => b.spentCents - a.spentCents),
     }))
     .sort((a, b) => {
-      // Budgeted or active groups first, then by spend.
       const score = (g: BudgetGroup) => (g.parent.limitCents > 0 ? 1_000_000 : 0) + g.parent.spentCents;
       return score(b) - score(a);
     });
 
-  return { month, groups, summary: overview.summary, incomeCents: overview.incomeCents };
+  // Spending that's happening but was never allocated a budget — visible so
+  // nothing is hidden, without cluttering the main list as a full envelope.
+  const unbudgeted: BudgetRow[] = topLevel
+    .filter((c) => !isAllocated(c))
+    .map(rowFor)
+    .filter((r) => r.spentCents > 0)
+    .sort((a, b) => b.spentCents - a.spentCents);
+
+  // Every category not yet allocated this month — what the "add allocation"
+  // picker offers, including ones with no spend yet (planning ahead).
+  const unallocated = topLevel.filter((c) => !isAllocated(c)).map((c) => ({ id: c.id, name: c.name, icon: c.icon }));
+
+  return { month, groups, unbudgeted, unallocated, summary: overview.summary, incomeCents: overview.incomeCents };
 }
 
 /** Recurring series detected from the last `months` of history. */
@@ -419,6 +455,45 @@ export async function getRecurring(userId: string, months = 6) {
     orderBy: { date: "asc" },
   });
   return detectRecurring(txns);
+}
+
+export type SubscriptionGroup = { categoryId: string; name: string; icon: string; color: string; monthlyCents: number; count: number };
+
+/**
+ * Everything the /subscriptions page needs: every detected recurring bill (a
+ * longer, 12-month lookback catches quarterly/yearly ones too), upcoming
+ * charges in the next 60 days, and spend grouped by top-level category.
+ */
+export async function getSubscriptions(userId: string) {
+  const [series, catMap] = await Promise.all([getRecurring(userId, 12), getCategoryMap(userId)]);
+  const topLevelOf = topLevelMap(catMap);
+  const subs = series.filter((s) => s.amountCents < 0);
+
+  const today = new Date();
+  const horizon = new Date(today.getTime() + 60 * 86_400_000);
+  const upcoming = upcomingOccurrences(subs, today, horizon);
+
+  const monthlyTotalCents = subs.reduce((s, x) => s + Math.abs(monthlyCents(x)), 0);
+
+  const groupsByCat = new Map<string, SubscriptionGroup>();
+  for (const s of subs) {
+    const topId = s.categoryId ? topLevelOf.get(s.categoryId) ?? s.categoryId : "__uncategorized__";
+    const meta = topId === "__uncategorized__" ? undefined : catMap.get(topId);
+    const g = groupsByCat.get(topId) ?? {
+      categoryId: topId,
+      name: meta?.name ?? "Uncategorized",
+      icon: meta?.icon ?? "❓",
+      color: meta?.color ?? "#7A879C",
+      monthlyCents: 0,
+      count: 0,
+    };
+    g.monthlyCents += Math.abs(monthlyCents(s));
+    g.count += 1;
+    groupsByCat.set(topId, g);
+  }
+  const groups = [...groupsByCat.values()].sort((a, b) => b.monthlyCents - a.monthlyCents);
+
+  return { subscriptions: subs, upcoming, monthlyTotalCents, groups };
 }
 
 /**
@@ -488,20 +563,26 @@ export async function getForecast(userId: string, month: string = currentMonthKe
   });
 }
 
+export type GoalContribution = { id: string; date: Date; amountCents: number; merchant: string };
+
 export type GoalView = Awaited<ReturnType<typeof prisma.goal.findMany>>[number] & {
   fundedCents: number;
   accountName: string | null;
   projection: GoalProjection | null;
+  contributions: GoalContribution[];
 };
 
-/** How far back we look to work out how fast a goal's account is growing. */
+/** How far back we look to work out how fast a goal is actually growing. */
 const GOAL_RATE_MONTHS = 6;
 
 /**
- * Goals with their effective funded amount and a projected finish date. When a
- * goal is linked to an account, progress tracks that account's (asset) balance
- * and the ETA comes from that account's recent net inflow; otherwise it falls
- * back to any manually-stored amount and has no projection to offer.
+ * Goals with their effective funded amount and a projected finish date.
+ *
+ * A goal is funded one of two ways: linked to an account (progress tracks
+ * that account's balance, and the ETA comes from its recent net inflow), or
+ * unlinked — in which case progress instead sums the transactions the user
+ * has tagged to this goal (a "contribution", regardless of which side of the
+ * ledger it landed on), so no separate manual top-up step exists.
  */
 export async function getGoals(userId: string): Promise<GoalView[]> {
   const goals = await prisma.goal.findMany({
@@ -511,37 +592,53 @@ export async function getGoals(userId: string): Promise<GoalView[]> {
   });
 
   const accountIds = [...new Set(goals.map((g) => g.account?.id).filter((id): id is string => !!id))];
-  const rateByAccount = new Map<string, number>();
-  if (accountIds.length) {
-    const months = lastMonths(GOAL_RATE_MONTHS);
-    const { start } = monthRange(months[0]);
-    const { end } = monthRange(months[months.length - 1]);
-    // Transfers count here: moving money into savings is how a goal gets funded.
-    const flows = await prisma.transaction.groupBy({
-      by: ["accountId"],
-      where: { userId, accountId: { in: accountIds }, date: { gte: start, lte: end } },
-      _sum: { amountCents: true },
-    });
-    for (const f of flows) {
-      rateByAccount.set(f.accountId, contributionRate([f._sum.amountCents ?? 0], GOAL_RATE_MONTHS));
-    }
+  const unlinkedGoalIds = goals.filter((g) => !g.accountId).map((g) => g.id);
+  const { start: rateStart } = monthRange(lastMonths(GOAL_RATE_MONTHS)[0]);
+
+  const [accountFlows, contributionTxns] = await Promise.all([
+    accountIds.length
+      ? // Transfers count here: moving money into savings is how a goal gets funded.
+        prisma.transaction.groupBy({
+          by: ["accountId"],
+          where: { userId, accountId: { in: accountIds }, date: { gte: rateStart } },
+          _sum: { amountCents: true },
+        })
+      : Promise.resolve([]),
+    unlinkedGoalIds.length
+      ? prisma.transaction.findMany({
+          where: { userId, goalId: { in: unlinkedGoalIds } },
+          select: { id: true, goalId: true, date: true, amountCents: true, merchant: true },
+          orderBy: { date: "desc" },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const rateByAccount = new Map(accountFlows.map((f) => [f.accountId, contributionRate([f._sum.amountCents ?? 0], GOAL_RATE_MONTHS)]));
+
+  const contributionsByGoal = new Map<string, GoalContribution[]>();
+  const fundedByGoal = new Map<string, number>();
+  for (const t of contributionTxns) {
+    if (!t.goalId) continue;
+    contributionsByGoal.set(t.goalId, [...(contributionsByGoal.get(t.goalId) ?? []), t]);
+    fundedByGoal.set(t.goalId, (fundedByGoal.get(t.goalId) ?? 0) + Math.abs(t.amountCents));
+  }
+  const rateByGoal = new Map<string, number>();
+  for (const [goalId, list] of contributionsByGoal) {
+    const recent = list.filter((t) => t.date >= rateStart).reduce((s, t) => s + Math.abs(t.amountCents), 0);
+    rateByGoal.set(goalId, contributionRate([recent], GOAL_RATE_MONTHS));
   }
 
   const fromMonth = currentMonthKey();
   return goals.map(({ account, ...g }) => {
-    const fundedCents = account ? Math.max(0, account.balanceCents) : g.savedCents;
+    const fundedCents = account ? Math.max(0, account.balanceCents) : g.savedCents + (fundedByGoal.get(g.id) ?? 0);
+    const monthlyRateCents = account ? rateByAccount.get(account.id) ?? 0 : rateByGoal.get(g.id) ?? 0;
     return {
       ...g,
       fundedCents,
       accountName: account?.name ?? null,
-      projection: account
-        ? projectGoal({
-            fundedCents,
-            targetCents: g.targetCents,
-            monthlyRateCents: rateByAccount.get(account.id) ?? 0,
-            fromMonth,
-            deadline: g.deadline,
-          })
+      contributions: (contributionsByGoal.get(g.id) ?? []).slice(0, 5),
+      projection: account || (contributionsByGoal.get(g.id)?.length ?? 0) > 0
+        ? projectGoal({ fundedCents, targetCents: g.targetCents, monthlyRateCents, fromMonth, deadline: g.deadline })
         : null,
     };
   });
@@ -556,27 +653,17 @@ export async function getReports(userId: string, months = 6, endMonth: string = 
   const { start } = monthRange(keys[0]);
   const { end } = monthRange(keys[keys.length - 1]);
 
-  const [txns, catMap, accountsOverview] = await Promise.all([
+  const [txns, catMap, accountsOverview, netWorthTrend] = await Promise.all([
     prisma.transaction.findMany({
       where: { userId, date: { gte: start, lte: end } },
-      select: { date: true, amountCents: true, categoryId: true, merchant: true, isTransfer: true },
+      select: { date: true, amountCents: true, categoryId: true, merchant: true, isTransfer: true, excludeFromBudget: true },
     }),
     getCategoryMap(userId),
     getAccountsOverview(userId),
+    getNetWorthTrend(userId, months, endMonth),
   ]);
 
-  // Resolve every category to its top-level ancestor so a report never counts a
-  // parent and its subcategory as two separate lines.
-  const topLevelOf = new Map<string, string>();
-  for (const c of catMap.values()) {
-    let cur: CategoryMeta | undefined = c;
-    const seen = new Set<string>();
-    while (cur?.parentId && !seen.has(cur.id)) {
-      seen.add(cur.id);
-      cur = catMap.get(cur.parentId);
-    }
-    topLevelOf.set(c.id, cur?.id ?? c.id);
-  }
+  const topLevelOf = topLevelMap(catMap);
 
   const reportTxns: ReportTxn[] = txns.map((t) => ({
     month: monthKey(t.date),
@@ -584,6 +671,7 @@ export async function getReports(userId: string, months = 6, endMonth: string = 
     categoryId: t.categoryId ? topLevelOf.get(t.categoryId) ?? t.categoryId : null,
     merchant: t.merchant,
     isTransfer: t.isTransfer,
+    excludeFromBudget: t.excludeFromBudget,
   }));
 
   const rows = monthlyRows(reportTxns, keys);
@@ -603,6 +691,7 @@ export async function getReports(userId: string, months = 6, endMonth: string = 
     totals: periodTotals(rows),
     trend,
     merchants: topMerchants(reportTxns),
+    netWorthTrend,
     assetsCents: accountsOverview.assetsCents,
     liabilitiesCents: accountsOverview.liabilitiesCents,
     netWorthCents: accountsOverview.netWorthCents,

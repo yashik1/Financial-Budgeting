@@ -2,20 +2,13 @@ import { requireUser } from "@/lib/session";
 import { getCalendarMonth, getForecast } from "@/lib/queries";
 import { formatCents, safeCurrency } from "@/lib/money";
 import { monthLabel, safeMonthKey } from "@/lib/dates";
-import { monthlyCents, type RecurringSeries } from "@/lib/recurring";
+import Link from "next/link";
+import { monthlyCents, CADENCE_LABEL } from "@/lib/recurring";
 import { MonthSwitcher } from "@/components/app/MonthSwitcher";
 import { cn } from "@/lib/cn";
-import { CalendarDays, Repeat, TrendingUp } from "lucide-react";
+import { CalendarDays, Repeat, TrendingUp, ArrowRight } from "lucide-react";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const CADENCE_LABEL: Record<RecurringSeries["cadence"], string> = {
-  weekly: "Weekly",
-  biweekly: "Every 2 weeks",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  yearly: "Yearly",
-};
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await requireUser();
@@ -163,9 +156,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       {/* Detected recurring items */}
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="card p-5" aria-label="Recurring bills">
-          <div className="mb-1 flex items-center gap-2">
-            <Repeat className="h-4 w-4 text-brand" />
-            <h2 className="text-lg font-bold">Bills &amp; subscriptions</h2>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Repeat className="h-4 w-4 text-brand" />
+              <h2 className="text-lg font-bold">Bills &amp; subscriptions</h2>
+            </div>
+            <Link href="/subscriptions" className="chip text-brand hover:underline">
+              See all <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
           <p className="mb-3 text-sm text-muted">
             Spotted automatically from your history · about {formatCents(monthlyBills, { currency, compact: true })}/month

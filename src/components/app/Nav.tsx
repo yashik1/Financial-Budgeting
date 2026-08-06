@@ -14,6 +14,7 @@ import {
   Settings,
   CalendarDays,
   BarChart3,
+  Repeat,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -23,6 +24,7 @@ const LINKS = [
   { href: "/transactions", label: "Transactions", icon: Receipt },
   { href: "/budgets", label: "Budgets", icon: Wallet },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/accounts", label: "Accounts", icon: Landmark },

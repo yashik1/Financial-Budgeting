@@ -38,6 +38,45 @@ async function ownTransaction(userId: string, id: string) {
   return t && t.userId === userId ? t : null;
 }
 
+/** Validate an owned category id, or clear the link when the field is blank. */
+async function ownCategoryId(userId: string, raw: FormDataEntryValue | null): Promise<string | null> {
+  const id = String(raw || "").trim();
+  if (!id) return null;
+  const row = await prisma.category.findFirst({ where: { id, userId }, select: { id: true } });
+  return row ? row.id : null;
+}
+
+/** Validate an owned, unlinked goal id — an account-linked goal can't also take tagged contributions. */
+async function ownContributableGoalId(userId: string, raw: FormDataEntryValue | null): Promise<string | null> {
+  const id = String(raw || "").trim();
+  if (!id) return null;
+  const row = await prisma.goal.findFirst({ where: { id, userId, accountId: null }, select: { id: true } });
+  return row ? row.id : null;
+}
+
+/** A transaction's type doubles as sign + the isTransfer flag (Plaid does the same). */
+function readFlow(raw: FormDataEntryValue | null, magnitude: number): { amountCents: number; isTransfer: boolean } {
+  switch (String(raw || "expense")) {
+    case "income":
+      return { amountCents: magnitude, isTransfer: false };
+    case "transfer_out":
+      return { amountCents: -magnitude, isTransfer: true };
+    case "transfer_in":
+      return { amountCents: magnitude, isTransfer: true };
+    case "expense":
+    default:
+      return { amountCents: -magnitude, isTransfer: false };
+  }
+}
+
+function readTags(raw: FormDataEntryValue | null): string[] {
+  return String(raw || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
 export async function addSubcategory(formData: FormData) {
   const user = await requireUser();
   const parentId = String(formData.get("parentId") || "");
@@ -76,22 +115,36 @@ export async function updateTransaction(formData: FormData) {
   if (!t) return;
   const merchant = String(formData.get("merchant") || "").trim() || t.merchant;
   const notesRaw = String(formData.get("notes") || "").trim();
-  const flow = String(formData.get("flow") || (t.amountCents >= 0 ? "in" : "out"));
   const amountStr = String(formData.get("amount") || "");
   const magnitude = amountStr ? Math.abs(dollarsToCents(amountStr)) : Math.abs(t.amountCents);
-  const amountCents = flow === "in" ? magnitude : -magnitude;
+  const typeRaw = formData.get("type");
+  const { amountCents, isTransfer } = typeRaw
+    ? readFlow(typeRaw, magnitude)
+    : { amountCents: t.amountCents >= 0 ? magnitude : -magnitude, isTransfer: t.isTransfer };
   const dateStr = String(formData.get("date") || "");
   const date = dateStr ? new Date(dateStr) : t.date;
-  const tags = String(formData.get("tags") || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 12);
+  const [categoryId, goalId] = await Promise.all([
+    formData.has("categoryId") ? ownCategoryId(user.id, formData.get("categoryId")) : Promise.resolve(t.categoryId),
+    formData.has("goalId") ? ownContributableGoalId(user.id, formData.get("goalId")) : Promise.resolve(t.goalId),
+  ]);
+  const excludeFromBudget = formData.get("excludeFromBudget") != null;
   await prisma.transaction.update({
     where: { id },
-    data: { merchant, notes: notesRaw || null, amountCents, date, tags },
+    data: {
+      merchant,
+      notes: notesRaw || null,
+      amountCents,
+      isTransfer,
+      date,
+      tags: readTags(formData.get("tags")),
+      categoryId,
+      goalId,
+      excludeFromBudget,
+    },
   });
   revalidatePath("/transactions");
+  revalidatePath("/budgets");
+  revalidatePath("/goals");
   revalidatePath("/dashboard");
 }
 
@@ -221,6 +274,14 @@ export async function setBudgetLimit(
   return { ok: true };
 }
 
+/** Un-allocate a category for the month — removes its row rather than zeroing it. */
+export async function removeBudgetAllocation(categoryId: string, month: string) {
+  const user = await requireUser();
+  await prisma.budgetLine.deleteMany({ where: { userId: user.id, categoryId, month } });
+  revalidatePath("/budgets");
+  revalidatePath("/dashboard");
+}
+
 // Validate that an account belongs to the user (or clear the link).
 async function ownAccountId(userId: string, raw: string): Promise<string | null> {
   const id = raw.trim();
@@ -285,26 +346,43 @@ export async function addManualTransaction(formData: FormData) {
   const acct = await prisma.account.findFirst({ where: { id: accountId, userId: user.id } });
   if (!acct) return;
   const merchant = String(formData.get("merchant") || "").trim() || "Manual entry";
-  const flow = String(formData.get("flow") || "out"); // in | out
   const magnitude = Math.abs(dollarsToCents(String(formData.get("amount") || "0")));
-  const amountCents = flow === "in" ? magnitude : -magnitude;
+  const { amountCents, isTransfer } = readFlow(formData.get("type"), magnitude);
   const dateStr = String(formData.get("date") || "");
   const date = dateStr ? new Date(dateStr) : new Date();
 
-  const rules = await prisma.rule.findMany({ where: { userId: user.id } });
-  const catName = categorize(merchant, rules.map((r) => ({ matcher: r.matcher, category: r.categoryId, priority: r.priority })));
+  const [pickedCategoryId, goalId] = await Promise.all([
+    ownCategoryId(user.id, formData.get("categoryId")),
+    ownContributableGoalId(user.id, formData.get("goalId")),
+  ]);
+
+  // Honor an explicit category; otherwise fall back to the same rule-matching
+  // an import uses, so a quick manual entry still gets sorted.
+  let categoryId = pickedCategoryId;
+  if (!categoryId) {
+    const rules = await prisma.rule.findMany({ where: { userId: user.id } });
+    categoryId = categorize(merchant, rules.map((r) => ({ matcher: r.matcher, category: r.categoryId, priority: r.priority })));
+  }
+
   await prisma.transaction.create({
     data: {
       userId: user.id,
       accountId,
       date,
       amountCents,
+      isTransfer,
       merchant,
       rawDescription: merchant,
-      categoryId: catName ?? null,
+      categoryId,
+      goalId,
+      notes: String(formData.get("notes") || "").trim() || null,
+      tags: readTags(formData.get("tags")),
+      excludeFromBudget: formData.get("excludeFromBudget") != null,
     },
   });
   revalidatePath("/transactions");
+  revalidatePath("/budgets");
+  revalidatePath("/goals");
   revalidatePath("/dashboard");
 }
 

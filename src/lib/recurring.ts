@@ -19,6 +19,14 @@ export type RecurringInput = {
 
 export type Cadence = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly";
 
+export const CADENCE_LABEL: Record<Cadence, string> = {
+  weekly: "Weekly",
+  biweekly: "Every 2 weeks",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+};
+
 export type RecurringSeries = {
   key: string;
   merchant: string;

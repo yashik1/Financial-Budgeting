@@ -4,6 +4,8 @@ import { getBudgetView, getUncategorizedForMonth, type BudgetRow } from "@/lib/q
 import { formatCents, safeCurrency } from "@/lib/money";
 import { monthLabel, safeMonthKey } from "@/lib/dates";
 import { BudgetLimitForm } from "@/components/app/BudgetLimitForm";
+import { AddBudgetAllocation } from "@/components/app/AddBudgetAllocation";
+import { RemoveBudgetAllocationButton } from "@/components/app/RemoveBudgetAllocationButton";
 import { AddSubcategory } from "@/components/app/AddSubcategory";
 import { DeleteSubcategoryButton } from "@/components/app/DeleteSubcategoryButton";
 import { MonthSwitcher } from "@/components/app/MonthSwitcher";
@@ -16,11 +18,14 @@ function Row({
   month,
   currency,
   child,
+  compact,
 }: {
   row: BudgetRow;
   month: string;
   currency: string;
   child?: boolean;
+  /** No inline limit editor — just spend, for the "not yet allocated" list. */
+  compact?: boolean;
 }) {
   const remaining = row.limitCents - row.spentCents;
   const barColor = row.over ? "bg-negative" : row.pct > 85 ? "bg-warning" : "bg-positive";
@@ -34,9 +39,11 @@ function Row({
       </span>
       <div className="min-w-[8rem] flex-1">
         <div className={cn("font-medium", child && "text-sm")}>{row.name}</div>
-        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2">
-          <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${Math.min(100, row.pct)}%` }} />
-        </div>
+        {!compact && (
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2">
+            <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${Math.min(100, row.pct)}%` }} />
+          </div>
+        )}
         <div className={cn("mt-1 text-[11px]", row.over ? "text-negative" : "text-muted")}>
           {formatCents(row.spentCents, { currency, compact: true })} spent
           {row.limitCents > 0 &&
@@ -46,6 +53,7 @@ function Row({
         </div>
       </div>
       <BudgetLimitForm categoryId={row.categoryId} month={month} limitCents={row.limitCents} currency={currency} />
+      {row.hasLine && <RemoveBudgetAllocationButton categoryId={row.categoryId} month={month} name={row.name} />}
       {child && <DeleteSubcategoryButton categoryId={row.categoryId} name={row.name} />}
     </div>
   );
@@ -71,9 +79,12 @@ export default async function BudgetsPage({ searchParams }: { searchParams: Prom
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Budgets</h1>
-          <p className="text-sm text-muted">Envelope budgeting with subcategories</p>
+          <p className="text-sm text-muted">Envelope budgeting — allocate a category to start tracking it</p>
         </div>
-        <MonthSwitcher month={month} basePath="/budgets" />
+        <div className="flex flex-wrap items-center gap-2">
+          <AddBudgetAllocation month={month} options={view.unallocated} currency={currency} />
+          <MonthSwitcher month={month} basePath="/budgets" />
+        </div>
       </header>
 
       {/* Summary */}
@@ -152,7 +163,24 @@ export default async function BudgetsPage({ searchParams }: { searchParams: Prom
             </div>
           );
         })}
+        {view.groups.length === 0 && (
+          <p className="card p-8 text-center text-sm text-muted">
+            No allocations yet — click <strong>Add allocation</strong> above to budget your first category.
+          </p>
+        )}
       </div>
+
+      {/* Categories with spending this month but no allocation yet */}
+      {view.unbudgeted.length > 0 && (
+        <div className="card px-4 py-2">
+          <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted">Spending without a budget</p>
+          <div className="divide-y divide-border">
+            {view.unbudgeted.map((row) => (
+              <Row key={row.categoryId} row={row} month={month} currency={currency} compact />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Uncategorized spending for the month */}
       {uncategorized.count > 0 && (

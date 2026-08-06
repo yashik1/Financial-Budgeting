@@ -33,6 +33,11 @@ describe("monthlyRows", () => {
     );
     expect(rows.every((r) => r.spendingCents === 0)).toBe(true);
   });
+
+  it("ignores a transaction marked off-budget", () => {
+    const rows = monthlyRows([{ ...t("2026-05", -900000, "New laptop", "shopping"), excludeFromBudget: true }], MONTHS);
+    expect(rows[0].spendingCents).toBe(0);
+  });
 });
 
 describe("periodTotals", () => {
