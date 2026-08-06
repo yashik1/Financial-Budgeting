@@ -9,7 +9,8 @@ const prisma = new PrismaClient();
 
 const DEMO_EMAIL = "demo@finbud.app";
 
-// Monthly envelope limits (cents) for the current month.
+// Monthly envelope limits (cents) for a fully-elapsed month — every one of
+// these categories reliably sees spend somewhere across a full month.
 const BUDGET_LIMITS: Record<string, number> = {
   "Rent & Mortgage": 185_000,
   Groceries: 55_000,
@@ -24,7 +25,6 @@ const BUDGET_LIMITS: Record<string, number> = {
   Fitness: 4_000,
   Healthcare: 15_000,
   Insurance: 15_000,
-  "Personal Care": 8_000,
 };
 
 async function main() {
@@ -144,19 +144,45 @@ async function main() {
   });
 
   // Budget lines for the last 6 months, so browsing past months stays alive.
+  // Past months are fully elapsed, so every category realistically has an
+  // allocation. The *current* month is still in progress: only pre-allocate
+  // the categories that have already posted spend this month — the rest
+  // (e.g. a subscription that bills later in the month) appear on their own
+  // the moment they post, or can be planned ahead with "Add allocation".
   const month = currentMonthKey();
   const budgetMonths = lastMonths(6, month);
+  const pastMonths = budgetMonths.filter((m) => m !== month);
+
+  const spentSoFarThisMonth = new Set(
+    (
+      await prisma.transaction.groupBy({
+        by: ["categoryId"],
+        where: { userId: user.id, date: { gte: new Date(`${month}-01T00:00:00Z`) }, isTransfer: false, amountCents: { lt: 0 } },
+      })
+    ).map((r) => r.categoryId),
+  );
+
   await prisma.budgetLine.createMany({
-    data: budgetMonths.flatMap((m) =>
-      Object.entries(BUDGET_LIMITS)
-        .filter(([name]) => categoryByName.has(name))
+    data: [
+      ...pastMonths.flatMap((m) =>
+        Object.entries(BUDGET_LIMITS)
+          .filter(([name]) => categoryByName.has(name))
+          .map(([name, limitCents]) => ({
+            userId: user.id,
+            categoryId: categoryByName.get(name)!,
+            month: m,
+            limitCents,
+          })),
+      ),
+      ...Object.entries(BUDGET_LIMITS)
+        .filter(([name]) => categoryByName.has(name) && spentSoFarThisMonth.has(categoryByName.get(name)!))
         .map(([name, limitCents]) => ({
           userId: user.id,
           categoryId: categoryByName.get(name)!,
-          month: m,
+          month,
           limitCents,
         })),
-    ),
+    ],
   });
 
   // Goals
