@@ -10,6 +10,11 @@ export async function register() {
   const { assertAuthSecret } = await import("./lib/auth");
   assertAuthSecret();
 
+  // Catches "I pulled new code but didn't migrate", which otherwise shows up as
+  // an opaque 500 on the first page that touches the changed model.
+  const { assertSchemaUpToDate } = await import("./lib/schemaCheck");
+  await assertSchemaUpToDate();
+
   // Provider credentials are encrypted at rest; warn rather than crash, since
   // the demo and CSV import work fine without any provider configured.
   const key = process.env.ENCRYPTION_KEY;

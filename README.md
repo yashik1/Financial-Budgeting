@@ -129,7 +129,22 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # ENCR
 ```
 
 Then click **“Try the demo — no signup”** to explore a fully-populated household
-(4 accounts, ~9 months of transactions, budgets, goals, streaks & badges).
+(4 accounts, ~9 months of transactions, budgets, goals, streaks & badges). Each
+visitor gets their own private copy of that dataset, which expires after a day.
+
+### If it won't start
+
+The server checks its own configuration at boot and refuses to run rather than
+failing later on a random request. The three messages you might see:
+
+| Message | Fix |
+|---|---|
+| `Database schema is out of date — pending migrations` (lists the missing columns) | `npx prisma migrate deploy` — you pulled new code without migrating |
+| `Database is empty — no FinBud tables found` | `npm run setup` |
+| `AUTH_SECRET is missing or too short` / `is still the example placeholder` | Generate one with the command above and put it in `.env` |
+
+A database that isn't accepting connections yet only logs a warning, so the app
+still boots if Postgres is a few seconds behind it.
 
 ### Useful scripts
 

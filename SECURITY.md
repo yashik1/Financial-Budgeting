@@ -29,10 +29,13 @@ providers (Plaid/SnapTrade) hold those; we only hold the access token they issue
   cookies — not readable by JS, sent only same-site. They last 7 days and carry a
   `tokenVersion` claim checked on every request, so **Settings → Sign out of all devices**
   (or any future password reset) invalidates every outstanding token immediately.
-- **`AUTH_SECRET` is validated at boot** (`src/instrumentation.ts`) — under 32 characters,
-  or equal to the placeholder that ships in `.env.example`, and the server refuses to
-  start. That placeholder is public in this repo; a deployment keeping it would let anyone
-  forge a session cookie for any user.
+- **Configuration is validated at boot** (`src/instrumentation.ts`) — the server refuses
+  to start if `AUTH_SECRET` is under 32 characters or is the placeholder that ships in
+  `.env.example` (that value is public in this repo; a deployment keeping it would let
+  anyone forge a session cookie for any user), and if the database is missing columns this
+  build expects (`src/lib/schemaCheck.ts`), which otherwise surfaces as opaque 500s on
+  every page that touches the changed model. An unreachable database only warns, so a
+  container that starts ahead of Postgres still comes up.
 - **Rate limiting** (`src/lib/rateLimit.ts`) on sign-in (per IP *and* per email), sign-up,
   the demo, and the AI coach. It's a per-instance sliding window — see the scaling note in
   that file for the Redis swap when running more than one instance.
