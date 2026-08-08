@@ -8,9 +8,16 @@ const HIGHLIGHTS = [
   { emoji: "🔌", title: "Connect anything", text: "CSV import today; banks & brokers via Plaid/SnapTrade next." },
 ];
 
-export default async function LoginPage() {
+const PAGE_ERRORS: Record<string, string> = {
+  demo: "The demo dataset hasn't been seeded yet. Run `npm run seed` and try again.",
+  rate: "That's a lot of demo sessions from your network. Give it a few minutes.",
+};
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await getCurrentUser();
   if (user) redirect("/dashboard");
+  const { error } = await searchParams;
+  const notice = error ? PAGE_ERRORS[error] : undefined;
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
@@ -53,7 +60,7 @@ export default async function LoginPage() {
           <h2 className="text-2xl font-bold">Welcome 👋</h2>
           <p className="mt-1 text-sm text-muted">Jump in with the demo, or sign in.</p>
         </div>
-        <LoginForm />
+        <LoginForm notice={notice} />
       </section>
     </main>
   );

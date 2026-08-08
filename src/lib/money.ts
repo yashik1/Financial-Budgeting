@@ -77,10 +77,19 @@ export function centsToInput(cents: number): string {
   return (Math.abs(cents) / 100).toFixed(2);
 }
 
+// Money columns are Postgres `Int` (int4), so a value outside this range makes
+// the driver throw rather than storing anything. Amounts are in cents, giving a
+// ceiling of ±$21,474,836.47 — far past any plausible transaction, and the
+// clamp turns a hostile or fat-fingered input into a saturated value instead of
+// a 500.
+export const MAX_CENTS = 2_147_483_647;
+export const MIN_CENTS = -2_147_483_648;
+
 export function dollarsToCents(dollars: number | string): number {
   const n = typeof dollars === "string" ? parseFloat(dollars) : dollars;
-  if (Number.isNaN(n)) return 0;
-  return Math.round(n * 100);
+  // Catches NaN plus the Infinity that "1e400" parses to.
+  if (!Number.isFinite(n)) return 0;
+  return clamp(Math.round(n * 100), MIN_CENTS, MAX_CENTS);
 }
 
 export function clamp(n: number, min: number, max: number): number {

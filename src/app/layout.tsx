@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -29,11 +30,14 @@ export const viewport: Viewport = {
 // Apply the saved/system theme + skin before first paint to avoid a flash.
 const themeScript = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('finbud-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){d.classList.add('dark');}var s=localStorage.getItem('finbud-skin');if(s&&s!=='refined'){d.setAttribute('data-skin',s);}}catch(e){}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Set by middleware; the CSP only trusts inline script carrying this nonce.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" className={sans.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-screen bg-bg font-sans text-fg antialiased">{children}</body>
     </html>

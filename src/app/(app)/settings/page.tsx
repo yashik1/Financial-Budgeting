@@ -4,7 +4,8 @@ import { countryName } from "@/lib/accountTypes";
 import { CurrencyPicker } from "@/components/app/CurrencyPicker";
 import { CountryPicker } from "@/components/app/CountryPicker";
 import { ThemePicker } from "@/components/app/ThemePicker";
-import { Coins, Globe, Palette } from "lucide-react";
+import { signOutEverywhere } from "@/app/(app)/actions";
+import { Coins, Globe, Palette, ShieldCheck } from "lucide-react";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -67,6 +68,27 @@ export default async function SettingsPage() {
           {user.country
             ? `New accounts default to ${countryName(user.country)} — you can still pick any country per account.`
             : "Pick a country to surface its registered accounts. You can always choose a different country on any single account."}
+        </p>
+      </section>
+
+      <section className="card space-y-4 p-5" aria-label="Security">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-bold">Security</h2>
+            <p className="text-sm text-muted">Sessions last a week on each device you sign in from.</p>
+          </div>
+        </div>
+
+        <form action={signOutEverywhere}>
+          <button className="btn-ghost text-negative">Sign out of all devices</button>
+        </form>
+
+        <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">
+          Ends every signed-in session for this account, including this one. Use it if you’ve signed in on a
+          shared computer or think someone else has access.
         </p>
       </section>
     </div>

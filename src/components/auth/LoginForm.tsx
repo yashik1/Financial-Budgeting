@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Sparkles, LogIn } from "lucide-react";
 import { loginDemo, signIn, signUp } from "@/app/login/actions";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 
 function SubmitButton({ children, className }: { children: React.ReactNode; className?: string }) {
   const { pending } = useFormStatus();
@@ -14,13 +15,17 @@ function SubmitButton({ children, className }: { children: React.ReactNode; clas
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ notice }: { notice?: string }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const action = mode === "signin" ? signIn : signUp;
   const [state, formAction] = useActionState(action, undefined);
 
   return (
     <div className="w-full max-w-sm">
+      {notice && (
+        <p className="mb-4 rounded-lg bg-negative/10 px-3 py-2 text-sm text-negative">{notice}</p>
+      )}
+
       <form action={loginDemo}>
         <SubmitButton className="btn-primary w-full text-base shadow-glow">
           <Sparkles className="h-4 w-4" />
@@ -47,7 +52,20 @@ export function LoginForm() {
         </div>
         <div>
           <label className="label" htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" className="input" placeholder="••••••••" autoComplete={mode === "signin" ? "current-password" : "new-password"} />
+          <input
+            id="password"
+            name="password"
+            type="password"
+            className="input"
+            placeholder="••••••••"
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            {...(mode === "signup" && { minLength: MIN_PASSWORD_LENGTH, "aria-describedby": "password-hint" })}
+          />
+          {mode === "signup" && (
+            <p id="password-hint" className="mt-1 text-xs text-muted">
+              At least {MIN_PASSWORD_LENGTH} characters. A short phrase beats a short jumble.
+            </p>
+          )}
         </div>
 
         {state?.error && (

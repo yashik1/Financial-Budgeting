@@ -14,6 +14,11 @@ import { formatCents } from "@/lib/money";
 
 type Account = { id: string; name: string };
 
+const MAX_CSV_MB = 10;
+const MAX_CSV_BYTES = MAX_CSV_MB * 1_000_000;
+/** Mirrored server-side in `importTransactions` — this check is just the friendly one. */
+const MAX_CSV_ROWS = 20_000;
+
 export function CsvImporter({ accounts, currency = "USD" }: { accounts: Account[]; currency?: string }) {
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
@@ -21,12 +26,28 @@ export function CsvImporter({ accounts, currency = "USD" }: { accounts: Account[
   const [map, setMap] = useState<Partial<ColumnMapping>>({});
   const [pending, start] = useTransition();
   const [result, setResult] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setError(null);
+    // The whole file is read into memory, so refuse anything that isn't
+    // plausibly a statement export. 10 MB is ~100k rows.
+    if (file.size > MAX_CSV_BYTES) {
+      setError(`That file is ${(file.size / 1_000_000).toFixed(1)} MB. Please pick a CSV under ${MAX_CSV_MB} MB.`);
+      e.target.value = "";
+      setParsed(null);
+      return;
+    }
     const text = await file.text();
     const p = parseCsv(text);
+    if (p.rows.length > MAX_CSV_ROWS) {
+      setError(`That file has ${p.rows.length.toLocaleString()} rows. Please split it into files of ${MAX_CSV_ROWS.toLocaleString()} or fewer.`);
+      e.target.value = "";
+      setParsed(null);
+      return;
+    }
     setParsed(p);
     const g = guessMapping(p.headers);
     setMap(g);
@@ -97,6 +118,10 @@ export function CsvImporter({ accounts, currency = "USD" }: { accounts: Account[
           <CheckCircle2 className="h-5 w-5" />
           <span className="font-semibold text-fg">Imported {result} transactions.</span> They’re auto-categorized and on your dashboard.
         </div>
+      )}
+
+      {error && (
+        <p className="card border-negative/40 bg-negative/10 p-4 text-sm text-negative">{error}</p>
       )}
 
       <div className="card space-y-4 p-5">

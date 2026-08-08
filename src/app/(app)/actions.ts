@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, revokeAllSessions, clearSession } from "@/lib/session";
 import { categorize } from "@/lib/categorize";
-import { dollarsToCents, formatCents, safeCurrency } from "@/lib/money";
+import { dollarsToCents, formatCents, safeCurrency, clamp, MIN_CENTS, MAX_CENTS } from "@/lib/money";
 import { isAssetForKind, kindForSubtype, KINDS } from "@/lib/accountTypes";
 
 const KIND_SET = new Set(KINDS.map((k) => k.kind));
@@ -15,6 +16,14 @@ function safeKind(input: string): string {
 function safeCountry(input: string): string | null {
   const c = input.trim().toUpperCase();
   return /^[A-Z]{2}$/.test(c) ? c : null;
+}
+
+/** Invalidate every session token for this account, including this one. */
+export async function signOutEverywhere() {
+  const user = await requireUser();
+  await revokeAllSessions(user.id);
+  await clearSession();
+  redirect("/login");
 }
 
 export async function setUserCurrency(formData: FormData) {
@@ -158,6 +167,9 @@ export async function deleteTransaction(id: string) {
 export async function recategorizeTransaction(txnId: string, categoryId: string) {
   const user = await requireUser();
   if (!(await ownTransaction(user.id, txnId))) return;
+  // Blank clears the category; anything else must be a category we own, or we'd
+  // let a caller point their transaction at another tenant's row.
+  if (categoryId && !(await ownCategoryId(user.id, categoryId))) return;
   await prisma.transaction.update({ where: { id: txnId }, data: { categoryId: categoryId || null } });
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
@@ -168,6 +180,7 @@ export async function recategorizeTransaction(txnId: string, categoryId: string)
 export async function bulkCategorize(ids: string[], categoryId: string) {
   const user = await requireUser();
   if (!ids.length) return;
+  if (categoryId && !(await ownCategoryId(user.id, categoryId))) return;
   await prisma.transaction.updateMany({
     where: { id: { in: ids }, userId: user.id },
     data: { categoryId: categoryId || null },
@@ -423,24 +436,36 @@ export type ImportRowInput = {
   rawDescription: string;
 };
 
+/** Matches the check in CsvImporter, which a caller can simply skip. */
+const MAX_IMPORT_ROWS = 20_000;
+const MAX_TEXT_LEN = 500;
+
+const trimField = (s: string | undefined, fallback: string) =>
+  (s || fallback).slice(0, MAX_TEXT_LEN);
+
 export async function importTransactions(accountId: string, rows: ImportRowInput[]) {
   const user = await requireUser();
   const acct = await prisma.account.findFirst({ where: { id: accountId, userId: user.id } });
   if (!acct) return { imported: 0 };
+  if (!Array.isArray(rows) || rows.length > MAX_IMPORT_ROWS) return { imported: 0 };
   const rules = await prisma.rule.findMany({ where: { userId: user.id } });
   const ruleList = rules.map((r) => ({ matcher: r.matcher, category: r.categoryId, priority: r.priority }));
 
   const data = rows
     .filter((r) => r.date && !Number.isNaN(new Date(r.date).getTime()))
-    .map((r) => ({
-      userId: user.id,
-      accountId,
-      date: new Date(r.date),
-      amountCents: r.amountCents,
-      merchant: r.merchant || "Imported",
-      rawDescription: r.rawDescription || r.merchant,
-      categoryId: categorize(r.rawDescription || r.merchant, ruleList) ?? null,
-    }));
+    .map((r) => {
+      const rawDescription = trimField(r.rawDescription, trimField(r.merchant, "Imported"));
+      return {
+        userId: user.id,
+        accountId,
+        date: new Date(r.date),
+        // The client sends cents directly, so bound it to what the column holds.
+        amountCents: clamp(Math.round(Number(r.amountCents) || 0), MIN_CENTS, MAX_CENTS),
+        merchant: trimField(r.merchant, "Imported"),
+        rawDescription,
+        categoryId: categorize(rawDescription, ruleList) ?? null,
+      };
+    });
 
   await prisma.transaction.createMany({ data });
   revalidatePath("/transactions");

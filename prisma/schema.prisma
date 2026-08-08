@@ -23,6 +23,11 @@ model User {
   name         String
   passwordHash String? // null for the seeded demo user (magic "Try the demo" login)
   isDemo       Boolean  @default(false)
+  // Ephemeral per-visitor demo clones are reaped after this instant.
+  demoExpiresAt DateTime?
+  // Bumped to invalidate every outstanding session token for this user
+  // (sign out everywhere, password change, suspected compromise).
+  tokenVersion Int      @default(0)
   currency     String   @default("USD") // ISO 4217 display currency
   country      String? // ISO 3166-1 alpha-2 default jurisdiction (for account types)
   createdAt    DateTime @default(now())
@@ -40,6 +45,8 @@ model User {
   stats        UserStats?
   plaidItems   PlaidItem[]
   snapTrade    SnapTradeConnection?
+
+  @@index([demoExpiresAt])
 }
 
 // A shared household groups members who see each other's (non-private) money.
