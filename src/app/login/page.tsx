@@ -10,6 +10,7 @@ const HIGHLIGHTS = [
 
 const PAGE_ERRORS: Record<string, string> = {
   demo: "The demo dataset hasn't been seeded yet. Run `npm run seed` and try again.",
+  "demo-failed": "Couldn't start a demo session — the server logged the reason (look for “demo login failed”).",
   rate: "That's a lot of demo sessions from your network. Give it a few minutes.",
 };
 

@@ -14,12 +14,20 @@ export async function loginDemo() {
   const gate = check(`demo:${ip}`, DEMO_LIMIT);
   if (!gate.ok) redirect("/login?error=rate");
 
-  // Opportunistic cleanup — no cron needed for a single-instance deploy.
-  await reapExpiredDemoUsers();
-
   // Each visitor gets a private, expiring copy of the seeded dataset so demo
-  // sessions can't see or overwrite one another.
-  const userId = await cloneDemoUser();
+  // sessions can't see or overwrite one another. Anything that goes wrong here
+  // used to surface as a bare "server-side exception" with no way to tell a
+  // missing seed from a database problem, so failures are named instead.
+  // `redirect` throws to unwind, so it has to happen outside the try.
+  let userId: string | null = null;
+  try {
+    await reapExpiredDemoUsers(); // opportunistic; no cron needed
+    userId = await cloneDemoUser();
+  } catch (e) {
+    console.error("[finbud] demo login failed while cloning the template user:", e);
+    redirect("/login?error=demo-failed");
+  }
+
   if (!userId) redirect("/login?error=demo"); // template missing: run `npm run seed`
   await setSession(userId);
   redirect("/dashboard");

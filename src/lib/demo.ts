@@ -36,6 +36,15 @@ export async function cloneDemoUser(): Promise<string | null> {
   });
   if (!template) return null;
 
+  // Pre-generate the new primary keys so every table can be written with a
+  // single bulk insert. Doing a `create()` per row instead meant ~30 sequential
+  // round trips inside one interactive transaction — fine against localhost,
+  // but slow and timeout-prone when the database is a network hop away.
+  const newId = () => randomUUID();
+  const catIds = new Map(template.categories.map((c) => [c.id, newId()]));
+  const acctIds = new Map(template.accounts.map((a) => [a.id, newId()]));
+  const goalIds = new Map(template.goals.map((g) => [g.id, newId()]));
+
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: {
@@ -49,65 +58,59 @@ export async function cloneDemoUser(): Promise<string | null> {
       },
     });
 
-    // Categories first: parents before children so parentId can be remapped.
-    const catIds = new Map<string, string>();
-    const parents = template.categories.filter((c) => !c.parentId);
-    const children = template.categories.filter((c) => c.parentId);
-    for (const c of [...parents, ...children]) {
-      const created = await tx.category.create({
-        data: {
-          userId: user.id,
-          name: c.name,
-          group: c.group,
-          icon: c.icon,
-          color: c.color,
-          isIncome: c.isIncome,
-          sort: c.sort,
-          parentId: c.parentId ? (catIds.get(c.parentId) ?? null) : null,
-        },
-      });
-      catIds.set(c.id, created.id);
-    }
+    // Parents before children in the same insert: Postgres checks the
+    // self-referencing foreign key row by row, in order.
+    const orderedCategories = [
+      ...template.categories.filter((c) => !c.parentId),
+      ...template.categories.filter((c) => c.parentId),
+    ];
+    await tx.category.createMany({
+      data: orderedCategories.map((c) => ({
+        id: catIds.get(c.id)!,
+        userId: user.id,
+        name: c.name,
+        group: c.group,
+        icon: c.icon,
+        color: c.color,
+        isIncome: c.isIncome,
+        sort: c.sort,
+        parentId: c.parentId ? (catIds.get(c.parentId) ?? null) : null,
+      })),
+    });
 
-    const acctIds = new Map<string, string>();
-    for (const a of template.accounts) {
-      const created = await tx.account.create({
-        data: {
-          userId: user.id,
-          name: a.name,
-          type: a.type,
-          subtype: a.subtype,
-          country: a.country,
-          institution: a.institution,
-          mask: a.mask,
-          balanceCents: a.balanceCents,
-          currency: a.currency,
-          isAsset: a.isAsset,
-          shared: a.shared,
-          color: a.color,
-          providerId: a.providerId,
-        },
-      });
-      acctIds.set(a.id, created.id);
-    }
+    await tx.account.createMany({
+      data: template.accounts.map((a) => ({
+        id: acctIds.get(a.id)!,
+        userId: user.id,
+        name: a.name,
+        type: a.type,
+        subtype: a.subtype,
+        country: a.country,
+        institution: a.institution,
+        mask: a.mask,
+        balanceCents: a.balanceCents,
+        currency: a.currency,
+        isAsset: a.isAsset,
+        shared: a.shared,
+        color: a.color,
+        providerId: a.providerId,
+      })),
+    });
 
-    const goalIds = new Map<string, string>();
-    for (const g of template.goals) {
-      const created = await tx.goal.create({
-        data: {
-          userId: user.id,
-          name: g.name,
-          emoji: g.emoji,
-          targetCents: g.targetCents,
-          savedCents: g.savedCents,
-          color: g.color,
-          shared: g.shared,
-          deadline: g.deadline,
-          accountId: g.accountId ? (acctIds.get(g.accountId) ?? null) : null,
-        },
-      });
-      goalIds.set(g.id, created.id);
-    }
+    await tx.goal.createMany({
+      data: template.goals.map((g) => ({
+        id: goalIds.get(g.id)!,
+        userId: user.id,
+        name: g.name,
+        emoji: g.emoji,
+        targetCents: g.targetCents,
+        savedCents: g.savedCents,
+        color: g.color,
+        shared: g.shared,
+        deadline: g.deadline,
+        accountId: g.accountId ? (acctIds.get(g.accountId) ?? null) : null,
+      })),
+    });
 
     // Transactions are the bulk of the data, so insert them in one statement.
     // `splitParentId` is dropped: createMany can't resolve self-references, and
@@ -165,7 +168,9 @@ export async function cloneDemoUser(): Promise<string | null> {
     });
 
     return user.id;
-  }, { timeout: 30_000 });
+    // maxWait covers acquiring a pooled connection, which is the part that
+    // bites on a busy or remote database; timeout covers the inserts.
+  }, { maxWait: 15_000, timeout: 30_000 });
 }
 
 /**
