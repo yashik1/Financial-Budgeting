@@ -24,7 +24,8 @@ On the **web service → Variables**, add:
 | `PLAID_CLIENT_ID` / `PLAID_SECRET` / `PLAID_ENV=sandbox` | *(optional)* enables bank connect |
 | `SNAPTRADE_CLIENT_ID` / `SNAPTRADE_CONSUMER_KEY` | *(optional)* enables broker connect |
 
-Generate the two secrets locally and paste the values:
+Generate the two secrets locally and paste the values — run it twice, once per
+variable, so they aren't the same string:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # AUTH_SECRET
@@ -32,6 +33,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # ENCR
 ```
 
 > Do **not** commit these. Railway injects them at runtime.
+
+> **Never paste the value from `.env.example`.** Anyone can read it in this
+> repo, so a deployment using it lets a stranger forge a session cookie for any
+> account and read that user's finances. The server checks for this at boot and
+> refuses to start — if a deploy crash-loops with *"AUTH_SECRET is still the
+> example placeholder"* or *"missing or too short"*, this is why. Changing
+> `AUTH_SECRET` signs everyone out, which is the right move if a real secret was
+> ever exposed.
 
 ## 3. Deploy
 

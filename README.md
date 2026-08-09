@@ -244,6 +244,10 @@ FinBud runs on Postgres and applies migrations automatically on each deploy
 
 - **Railway** (recommended): step-by-step in [`docs/DEPLOY-RAILWAY.md`](./docs/DEPLOY-RAILWAY.md)
   — add a Postgres plugin, set env vars, deploy.
+- **A deploy that crash-loops** is usually a config problem the boot check caught; the
+  reason is the first error line in the deploy logs. See
+  [if it won't start](#if-it-wont-start) — on a hosted platform this reads as a generic
+  error page in the browser, because the container never comes up.
 - **Anywhere else**: any host that runs a Node server + Postgres works. Set `DATABASE_URL`,
   `AUTH_SECRET`, `ENCRYPTION_KEY`, run `prisma migrate deploy`, then `next start`. Only add
   `DIRECT_URL` (+ the `directUrl` line in the schema) if `DATABASE_URL` is a pooled URL. See
