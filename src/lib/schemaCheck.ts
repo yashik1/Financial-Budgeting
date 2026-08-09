@@ -32,8 +32,9 @@ const SETUP_HINT = `
     npx prisma migrate deploy   # migrate only, keeps existing data
 `;
 
-function banner(title: string, detail: string): string {
-  return `\n${"─".repeat(72)}\n  ${title}\n${"─".repeat(72)}\n${detail}${SETUP_HINT}${"─".repeat(72)}\n`;
+function banner(title: string, detail: string, hint: string = SETUP_HINT): string {
+  const rule = "─".repeat(72);
+  return `\n${rule}\n  ${title}\n${rule}\n${detail}${hint}${rule}\n`;
 }
 
 /** Prisma pads its messages with blank lines and leads with a boilerplate
@@ -55,30 +56,67 @@ export class SchemaOutOfDateError extends Error {
   }
 }
 
+/** Thrown when the database never became reachable during startup. */
+export class DatabaseUnreachableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DatabaseUnreachableError";
+  }
+}
+
+/** Retry budget for the initial connection: enough to ride out a container
+ *  that starts before Postgres, short enough that a genuinely-down database is
+ *  reported quickly rather than silently 500ing every request. */
+const CONNECT_ATTEMPTS = 5;
+const CONNECT_BACKOFF_MS = [500, 1000, 2000, 4000];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Verify the live database has the columns this build expects.
+ * Verify the live database is reachable and has the columns this build expects.
  *
- * Throws `SchemaOutOfDateError` on drift. A database that simply isn't
- * reachable yet is *not* an error here — that's a common startup race in
- * container deploys, and Prisma will report it per-request anyway.
+ * Throws `SchemaOutOfDateError` on drift, or `DatabaseUnreachableError` if the
+ * connection never comes up. Both are fatal by design: a server that boots
+ * "successfully" and then returns an opaque 500 on every page is far harder to
+ * diagnose than one that refuses to start and says why. Under an orchestrator
+ * this crash-loops until the database is ready, which is the desired behaviour.
  */
 export async function assertSchemaUpToDate(): Promise<void> {
   const tables = [...new Set(REQUIRED_COLUMNS.map(([t]) => t))];
 
-  let present: Array<{ table_name: string; column_name: string }>;
-  try {
-    present = await prisma.$queryRaw<Array<{ table_name: string; column_name: string }>>`
-      SELECT table_name, column_name
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = ANY(${tables})
-    `;
-  } catch (e) {
-    console.warn(
-      `[finbud] Couldn't verify the database schema at startup: ${firstLine(e)}.` +
-        " Continuing — if the database is still starting up this is expected.",
+  let present: Array<{ table_name: string; column_name: string }> | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < CONNECT_ATTEMPTS; attempt++) {
+    try {
+      present = await prisma.$queryRaw<Array<{ table_name: string; column_name: string }>>`
+        SELECT table_name, column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ANY(${tables})
+      `;
+      break;
+    } catch (e) {
+      lastError = e;
+      const wait = CONNECT_BACKOFF_MS[attempt];
+      if (wait === undefined) break; // out of retries
+      console.warn(
+        `[finbud] Database not reachable yet (${firstLine(e)}) — retrying in ${wait}ms.`,
+      );
+      await sleep(wait);
+    }
+  }
+
+  if (!present) {
+    throw new DatabaseUnreachableError(
+      banner("Can't reach the database.", `\n  ${firstLine(lastError)}\n`, `
+  Start Postgres, then start the app again:
+
+    docker compose up -d db
+
+  If it runs somewhere else, check DATABASE_URL in .env.
+`),
     );
-    return;
   }
 
   const found = new Set(present.map((r) => `${r.table_name}.${r.column_name}`));

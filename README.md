@@ -139,12 +139,15 @@ failing later on a random request. The three messages you might see:
 
 | Message | Fix |
 |---|---|
+| `Can't reach the database` | `docker compose up -d db` — Postgres isn't running, or `DATABASE_URL` points somewhere else |
 | `Database schema is out of date — pending migrations` (lists the missing columns) | `npx prisma migrate deploy` — you pulled new code without migrating |
 | `Database is empty — no FinBud tables found` | `npm run setup` |
 | `AUTH_SECRET is missing or too short` / `is still the example placeholder` | Generate one with the command above and put it in `.env` |
 
-A database that isn't accepting connections yet only logs a warning, so the app
-still boots if Postgres is a few seconds behind it.
+The connection is retried for a few seconds first, so a container that starts
+ahead of Postgres still comes up. Note that a stopped database doesn't break
+`/login` — that page needs no queries — so the failure would otherwise only
+appear once you click **Try the demo**.
 
 ### Useful scripts
 

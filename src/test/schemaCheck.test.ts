@@ -5,7 +5,9 @@ vi.mock("server-only", () => ({}));
 const queryRaw = vi.fn();
 vi.mock("@/lib/db", () => ({ prisma: { $queryRaw: (...a: unknown[]) => queryRaw(...a) } }));
 
-const { assertSchemaUpToDate, SchemaOutOfDateError } = await import("@/lib/schemaCheck");
+const { assertSchemaUpToDate, SchemaOutOfDateError, DatabaseUnreachableError } = await import(
+  "@/lib/schemaCheck"
+);
 
 /** Every column the check requires, as information_schema would return them. */
 const ALL_COLUMNS = [
@@ -54,19 +56,59 @@ describe("schema drift check", () => {
     await expect(assertSchemaUpToDate()).rejects.toThrow(/npm run setup/);
   });
 
-  it("does not throw when the database is merely unreachable yet", async () => {
+  // Mocks throw synchronously rather than returning a rejected promise: Vitest
+  // tracks a rejecting async mock's result and reports it as an unhandled
+  // rejection even once the code under test has caught it. Both land in the
+  // same catch, so this exercises the path we care about.
+  const unreachable = () => {
+    throw new Error("\nInvalid `prisma.$queryRaw()` invocation:\n\n\nCan't reach database server\n");
+  };
+
+  it("rides out a database that's still starting up", async () => {
     // Container deploys routinely start the app before Postgres accepts
-    // connections; that must not be a fatal boot error.
-    // Throws synchronously rather than returning a rejected promise: Vitest
-    // tracks a rejecting async mock's result and reports it as an unhandled
-    // rejection even once the code under test has caught it. Both land in the
-    // same catch, so this exercises the path we care about.
+    // connections, so a first failure must not be fatal.
+    let calls = 0;
     queryRaw.mockImplementation(() => {
-      throw new Error("\nInvalid `prisma.$queryRaw()` invocation:\n\n\nCan't reach database server\n");
+      if (++calls < 3) unreachable();
+      return Promise.resolve(ALL_COLUMNS);
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await expect(assertSchemaUpToDate()).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Can't reach database server"));
+    expect(calls).toBe(3);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("retrying"));
     warn.mockRestore();
+  });
+
+  /** Run the check against a permanently-dead database, skipping the real
+   *  backoff waits so the test doesn't take the full retry budget. */
+  async function runWithoutWaiting(): Promise<Error> {
+    queryRaw.mockImplementation(unreachable);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const settled = assertSchemaUpToDate().then(
+        () => new Error("expected it to throw, but it resolved"),
+        (e: Error) => e,
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      return await settled;
+    } finally {
+      vi.useRealTimers();
+      warn.mockRestore();
+    }
+  }
+
+  it("gives up with an actionable message when it never connects", async () => {
+    // Warning and then serving opaque 500s on every page is worse than
+    // refusing to start, so exhausting the retries is fatal.
+    const err = await runWithoutWaiting();
+    expect(err).toBeInstanceOf(DatabaseUnreachableError);
+    expect(err.message).toContain("Can't reach the database");
+  });
+
+  it("tells you to start Postgres rather than to migrate", async () => {
+    const err = await runWithoutWaiting();
+    expect(err.message).toContain("docker compose up -d db");
+    expect(err.message).not.toContain("prisma migrate deploy");
   });
 });
