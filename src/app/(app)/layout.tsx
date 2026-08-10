@@ -76,8 +76,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
-      {/* Main */}
-      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 outline-none lg:px-8 lg:pb-10">
+      {/* Main. `min-w-0` matters: as a grid item this column would otherwise be
+          sized by its widest content (grid items default to `min-width: auto`),
+          so one un-shrinkable child makes the whole page scroll sideways. */}
+      <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-28 pt-6 outline-none lg:px-8 lg:pb-10">
         {children}
       </main>
 

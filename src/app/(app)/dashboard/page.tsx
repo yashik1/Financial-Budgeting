@@ -162,7 +162,7 @@ export default async function DashboardPage({
                 </Link>
               }
             />
-            <p className={`text-2xl font-extrabold tabular ${forecast.projectedNetCents >= 0 ? "text-positive" : "text-negative"}`}>
+            <p className={`figure ${forecast.projectedNetCents >= 0 ? "text-positive" : "text-negative"}`}>
               {formatCents(forecast.projectedNetCents, { currency, signed: true })}
             </p>
             <p className="mt-1 text-xs text-muted">projected saved at month end</p>

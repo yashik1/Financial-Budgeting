@@ -19,7 +19,7 @@ export function CountryPicker({ current }: { current: string }) {
   const [value, setValue] = useState(current);
   return (
     <form action={setUserCountry} className="flex flex-wrap items-end gap-3">
-      <div className="min-w-[16rem] flex-1">
+      <div className="w-full flex-1 sm:w-auto sm:min-w-[16rem]">
         <label className="label" htmlFor="country">Home country</label>
         <select
           id="country"

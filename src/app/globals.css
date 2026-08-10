@@ -271,6 +271,32 @@ button:not(:disabled),
 }
 
 /* Tabular, aligned figures — numbers are the hero in finance UIs. */
+/* Grid and flex children are `min-width: auto` by default, meaning they refuse
+   to shrink below their content's intrinsic width. One wide child — a chart, a
+   long merchant name, a row of chips — then widens its track and the whole page
+   scrolls sideways on a phone. Letting them shrink makes the content wrap or
+   ellipsise instead, which is what every layout here actually wants.
+   `shrink-0` still works, since that's flex-shrink rather than min-width. */
+main :where(.grid, .flex) > * {
+  min-width: 0;
+}
+
+/* Counterpart to the rule above. Now that flex children may shrink, decide what
+   gives: an amount or a chip is already as short as it can be, so squeezing it
+   just clips digits. Keep those at their natural width and let the label beside
+   them truncate instead. flex-shrink is inert outside a flex container, so this
+   is a no-op everywhere else. */
+main :where(.tabular, .figure, .figure-sm, .chip) {
+  flex-shrink: 0;
+}
+
+/* ...but a chip must never be wider than the row holding it. A long label
+   (a challenge name, a goal) then wraps inside the pill instead of pushing
+   past the card edge. */
+main .chip {
+  max-width: 100%;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "cv01";
@@ -318,8 +344,21 @@ button:not(:disabled),
   .label {
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
   }
-  /* Big money figures on stat tiles / heroes. */
+  /* Money figures. Amounts are unbounded — a long balance, a currency with a
+     three-letter symbol, or a locale that groups differently all make these
+     wider than a fixed type scale allows, and on a narrow phone the digits get
+     clipped by their column. Sizing with clamp() lets them shrink to fit the
+     viewport instead, while keeping the intended size from `sm` upwards. */
   .figure {
-    @apply text-2xl font-extrabold tabular tracking-tight;
+    @apply font-extrabold tabular tracking-tight;
+    font-size: clamp(1.05rem, 5.2vw, 1.7rem);
+    line-height: 1.15;
+  }
+  /* Secondary figures: summary rows, forecast tiles, anything in a multi-column
+     strip where the column is narrower than the card. */
+  .figure-sm {
+    @apply font-extrabold tabular tracking-tight;
+    font-size: clamp(1rem, 4vw, 1.25rem);
+    line-height: 1.2;
   }
 }

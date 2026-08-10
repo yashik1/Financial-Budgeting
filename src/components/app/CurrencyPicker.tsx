@@ -37,7 +37,7 @@ export function CurrencyPicker({ current }: { current: string }) {
 
   return (
     <form action={setUserCurrency} className="flex flex-wrap items-end gap-3">
-      <div className="min-w-[16rem] flex-1">
+      <div className="w-full flex-1 sm:w-auto sm:min-w-[16rem]">
         <label className="label" htmlFor="currency">Display currency</label>
         <select
           id="currency"

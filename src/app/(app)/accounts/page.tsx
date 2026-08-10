@@ -10,6 +10,7 @@ import { isSnapTradeEnabled } from "@/lib/aggregation/snaptrade";
 import { ConnectPanel } from "@/components/app/ConnectPanel";
 import { AccountEditor } from "@/components/app/AccountEditor";
 import { AccountTypeSelect } from "@/components/app/AccountTypeSelect";
+import { SummaryStat } from "@/components/ui/StatTile";
 import { cn } from "@/lib/cn";
 import { Upload, Sparkles, PlusCircle } from "lucide-react";
 
@@ -40,19 +41,10 @@ export default async function AccountsPage() {
       </header>
 
       {/* Net worth summary */}
-      <div className="card grid grid-cols-3 gap-4 p-5">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted">Assets</div>
-          <div className="text-xl font-extrabold tabular text-positive">{formatCents(assetsCents, { currency })}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted">Liabilities</div>
-          <div className="text-xl font-extrabold tabular text-negative">{formatCents(liabilitiesCents, { currency })}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted">Net worth</div>
-          <div className="text-xl font-extrabold tabular">{formatCents(netWorthCents, { currency })}</div>
-        </div>
+      <div className="card grid grid-cols-1 gap-2 p-5 sm:grid-cols-3 sm:gap-4">
+        <SummaryStat label="Assets" value={formatCents(assetsCents, { currency })} tone="positive" />
+        <SummaryStat label="Liabilities" value={formatCents(liabilitiesCents, { currency })} tone="negative" />
+        <SummaryStat label="Net worth" value={formatCents(netWorthCents, { currency })} />
       </div>
 
       {/* Accounts grouped by institution */}

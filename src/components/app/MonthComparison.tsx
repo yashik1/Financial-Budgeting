@@ -56,7 +56,9 @@ export function MonthComparison({ data, currency }: { data: Comparison; currency
     <div className="space-y-4">
       <CompareSelect month={data.month} compare={data.prevMonth} />
 
-      <div className="grid grid-cols-3 gap-2.5">
+      {/* One column on the narrowest phones: three tiles leave ~75px each,
+          which isn't enough for an amount plus its delta chip. */}
+      <div className="grid grid-cols-1 gap-2.5 min-[390px]:grid-cols-3">
         {METRICS.map((m) => {
           const d = data[m.key];
           return (

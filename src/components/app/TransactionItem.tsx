@@ -91,7 +91,11 @@ export function TransactionItem({
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: `${txn.categoryColor}1f` }}>
           {txn.categoryIcon}
         </div>
-        <div className="min-w-0 flex-1">
+        {/* A floor rather than min-w-0: with the category picker, amount and
+            edit button all holding their width, an unbounded flex child gets
+            crushed to a couple of characters on a small phone. Giving it a
+            minimum makes the row wrap instead. */}
+        <div className="min-w-[6rem] flex-1">
           <div className="flex items-center gap-1.5 font-medium">
             <span className="truncate">{txn.merchant}</span>
             {txn.notes && <StickyNote className="h-3.5 w-3.5 shrink-0 text-muted" />}
@@ -119,8 +123,12 @@ export function TransactionItem({
             </div>
           )}
         </div>
-        <CategorySelect txnId={txn.id} value={txn.categoryId} categories={categories} />
-        <div className={`w-24 shrink-0 text-right font-semibold tabular ${income ? "text-positive" : "text-fg"}`}>
+        {/* Below sm the picker drops to its own line, so the merchant and
+            amount keep a full row to themselves. */}
+        <div className="order-last w-full sm:order-none sm:w-auto">
+          <CategorySelect txnId={txn.id} value={txn.categoryId} categories={categories} />
+        </div>
+        <div className={`ml-auto w-24 shrink-0 text-right font-semibold tabular sm:ml-0 ${income ? "text-positive" : "text-fg"}`}>
           {formatCents(txn.amountCents, { currency, signed: true })}
         </div>
         <button

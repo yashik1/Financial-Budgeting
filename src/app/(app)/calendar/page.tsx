@@ -5,6 +5,7 @@ import { monthLabel, safeMonthKey } from "@/lib/dates";
 import Link from "next/link";
 import { monthlyCents, CADENCE_LABEL } from "@/lib/recurring";
 import { MonthSwitcher } from "@/components/app/MonthSwitcher";
+import { SummaryStat } from "@/components/ui/StatTile";
 import { cn } from "@/lib/cn";
 import { CalendarDays, Repeat, TrendingUp, ArrowRight } from "lucide-react";
 
@@ -59,23 +60,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       </header>
 
       {/* Forecast strip */}
-      <section className="card grid gap-4 p-5 sm:grid-cols-4" aria-label="Cash-flow forecast">
-        <div>
+      <section className="card grid grid-cols-1 gap-2 p-5 sm:grid-cols-4 sm:gap-4" aria-label="Cash-flow forecast">
+        <div className="flex items-baseline justify-between gap-3 sm:block">
           <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
             <TrendingUp className="h-3.5 w-3.5" /> Projected month end
           </div>
-          <div className={cn("text-xl font-extrabold tabular", forecast.projectedNetCents >= 0 ? "text-positive" : "text-negative")}>
+          <div className={cn("figure-sm sm:mt-0.5", forecast.projectedNetCents >= 0 ? "text-positive" : "text-negative")}>
             {formatCents(forecast.projectedNetCents, { currency, signed: true })}
           </div>
         </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted">Projected income</div>
-          <div className="text-xl font-extrabold tabular">{formatCents(forecast.projectedIncomeCents, { currency })}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted">Projected spending</div>
-          <div className="text-xl font-extrabold tabular">{formatCents(forecast.projectedSpendingCents, { currency })}</div>
-        </div>
+        <SummaryStat label="Projected income" value={formatCents(forecast.projectedIncomeCents, { currency })} />
+        <SummaryStat label="Projected spending" value={formatCents(forecast.projectedSpendingCents, { currency })} />
         <div>
           <div className="text-xs uppercase tracking-wide text-muted">Still to come</div>
           <div className="text-sm">

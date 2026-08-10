@@ -123,7 +123,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   return (
                   <li key={c.categoryId}>
                     <div className="mb-1.5 flex items-center gap-2 text-sm">
-                      <span>{c.icon} {c.name}</span>
+                      <span className="truncate">{c.icon} {c.name}</span>
                       <ChangeChip pct={c.changePct} />
                       <span className="ml-auto tabular font-medium">
                         {formatCents(c.totalCents, { currency, compact: true })}

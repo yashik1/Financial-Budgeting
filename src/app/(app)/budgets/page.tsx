@@ -12,6 +12,7 @@ import { MonthSwitcher } from "@/components/app/MonthSwitcher";
 import { CategorySelect, type CatOption } from "@/components/app/CategorySelect";
 import { cn } from "@/lib/cn";
 import { ChevronRight } from "lucide-react";
+import { SummaryStat } from "@/components/ui/StatTile";
 
 function Row({
   row,
@@ -89,25 +90,15 @@ export default async function BudgetsPage({ searchParams }: { searchParams: Prom
 
       {/* Summary */}
       <div className="card p-5">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted">Budgeted</div>
-            <div className="text-xl font-extrabold tabular">{formatCents(s.budgetedCents, { currency })}</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted">Spent</div>
-            <div className="text-xl font-extrabold tabular">{formatCents(s.spentCents, { currency })}</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted">Remaining</div>
-            <div className={cn("text-xl font-extrabold tabular", s.remainingCents < 0 ? "text-negative" : "text-positive")}>
-              {formatCents(s.remainingCents, { currency })}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted">Unbudgeted income</div>
-            <div className="text-xl font-extrabold tabular">{formatCents(leftover, { currency })}</div>
-          </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:gap-4">
+          <SummaryStat label="Budgeted" value={formatCents(s.budgetedCents, { currency })} />
+          <SummaryStat label="Spent" value={formatCents(s.spentCents, { currency })} />
+          <SummaryStat
+            label="Remaining"
+            value={formatCents(s.remainingCents, { currency })}
+            tone={s.remainingCents < 0 ? "negative" : "positive"}
+          />
+          <SummaryStat label="Unbudgeted income" value={formatCents(leftover, { currency })} />
         </div>
         <div className="mt-4 h-3 overflow-hidden rounded-full bg-surface-2">
           <div
